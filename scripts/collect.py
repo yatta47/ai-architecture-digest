@@ -446,13 +446,13 @@ def build_prompt(row, vocab: dict) -> str:
   "outcome": {{"type": "outcomesから1つ"}},
   "summary": "『## 概要』に入れる2〜3文の日本語要約",
   "design_point": "『## 設計のポイント』に入れる、再利用できる設計判断を2〜3文",
-  "use_case": "『## 使いどころ』に入れる、どんな場面・人に効くかを1〜2文"
+  "use_case": ["『## 使いどころ』の箇条書き。誰に/どんな場面で効くかを1項目ずつ、2〜4個（各項目1文程度・文字列の配列）"]
 }}
 
 判定の指針:
 - type: 具体的な実装事例=case / 手引き・リファレンス=guidance / 意見・考察=opinion / 提供開始・機能告知=announcement
 - 具体的な構成が読み取れない記事でも type で分類して出す（事例以外は company/components が空でよい）
-- ai_relevant=false（非AI）のときは深掘りファセットを無理に埋めない: patterns / components / data_sources は空配列、design_point / use_case は空文字でよい。
+- ai_relevant=false（非AI）のときは深掘りファセットを無理に埋めない: patterns / components / data_sources は空配列、design_point は空文字・use_case は空配列でよい。
   ただし summary（概要）と company / industry / cloud / outcome は通常どおり埋める（網羅カバレッジ用の軽量カードになる）。
 
 語彙（できるだけこの中から選ぶ。適切な語が無ければ新しい語を作ってよい）:
@@ -525,10 +525,16 @@ def write_case(row, data: dict) -> Path:
     # 公開日が抽出できなければ取得日(fetched_at)にフォールバック（空欄を作らない）
     fm["published_at"] = row["published"] or (row["fetched_at"] or "")[:10]
     if ai_relevant:
+        # 使いどころは markdown 箇条書き（配列）。後方互換で文字列(prose)も許容。
+        uc = data.get("use_case")
+        if isinstance(uc, list):
+            use_case_md = "\n".join(f"- {str(x).strip()}" for x in uc if str(x).strip())
+        else:
+            use_case_md = (uc or "").strip()
         body = (
             f"## 概要\n\n{data.get('summary','').strip()}\n\n"
             f"## 設計のポイント\n\n{data.get('design_point','').strip()}\n\n"
-            f"## 使いどころ\n\n{data.get('use_case','').strip()}\n"
+            f"## 使いどころ\n\n{use_case_md}\n"
         )
     else:
         body = f"## 概要\n\n{data.get('summary','').strip()}\n"

@@ -39,4 +39,6 @@ Kubernetesは今やAI/MLワークロードの標準基盤となり、Kubeflowは
 
 ## 使いどころ
 
-notebookのImagePullBackOffやOOMKilled、学習ジョブの失敗をPodの条件・理由からその場で調べたいクラスタ運用者やSREに効く。専用MLダッシュボードとkubectlを行き来せず、単一のKubernetes UIで名前空間横断の状態把握とトラブルシュートを完結できる。
+- notebookでImagePullBackOffやOOMKilled、学習ジョブの失敗をPodの条件・理由からその場で調べたいクラスタ運用者やSRE
+- 専用MLダッシュボードとkubectlを行き来せず、単一のKubernetes UIで名前空間横断の状態把握を完結させたい場面
+- トラブルシュートを別ツールに切り替えず1つのUIで済ませたい運用現場
