@@ -1,5 +1,6 @@
 ---
 import { url, plainExcerpt } from '../lib/facets';
+import { label } from '../lib/labels';
 import type { CaseEntry } from '../lib/facets';
 
 interface Props {
@@ -10,7 +11,7 @@ const d = entry.data;
 const excerpt = plainExcerpt(entry.body, 140);
 const cloud = d.cloud[0] || 'none';
 const thumbLabel = (d.cloud[0] || d.source_id || 'src').toUpperCase();
-const metaBits = [d.source_name, ...d.cloud, d.industry, d.company].filter(Boolean);
+const metaBits = [d.source_name, ...d.cloud, label('industries', d.industry), d.company].filter(Boolean);
 const isNew = Date.now() - new Date(d.published_at).getTime() < 14 * 864e5;
 ---
 

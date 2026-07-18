@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { allCases, facetSummary, accessors, url } from '../lib/facets';
+import { label as jaLabel } from '../lib/labels';
 
 const entries = await allCases();
 const groups = [
@@ -25,7 +26,7 @@ const groups = [
         <div class="exp-title">{g.label}</div>
         {g.items.map((it) => (
           <a class="exp-link" href={url(`${g.route}/${it.slug}`)}>
-            <span>{it.label}</span><span class="c">{it.count}</span>
+            <span>{jaLabel(g.key, it.label)}</span><span class="c">{it.count}</span>
           </a>
         ))}
       </div>
