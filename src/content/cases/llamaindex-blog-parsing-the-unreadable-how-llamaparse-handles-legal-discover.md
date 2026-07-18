@@ -25,7 +25,7 @@ outcome:
 source_id: llamaindex-blog
 source_name: LlamaIndex Blog
 source_url: https://www.llamaindex.ai/blog/parsing-the-unreadable-how-llamaparse-handles-legal-discovery-documents
-published_at: ''
+published_at: '2026-07-18'
 ---
 
 ## 概要

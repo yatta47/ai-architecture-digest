@@ -29,7 +29,7 @@ outcome:
 source_id: llamaindex-blog
 source_name: LlamaIndex Blog
 source_url: https://www.llamaindex.ai/blog/parsebench
-published_at: ''
+published_at: '2026-07-18'
 ---
 
 ## 概要

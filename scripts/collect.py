@@ -503,7 +503,8 @@ def write_case(row, data: dict) -> Path:
     fm["source_id"] = row["source_id"]
     fm["source_name"] = row["source_name"]
     fm["source_url"] = row["url"]
-    fm["published_at"] = row["published"] or ""
+    # 公開日が抽出できなければ取得日(fetched_at)にフォールバック（空欄を作らない）
+    fm["published_at"] = row["published"] or (row["fetched_at"] or "")[:10]
     body = (
         f"## 概要\n\n{data.get('summary','').strip()}\n\n"
         f"## 設計のポイント\n\n{data.get('design_point','').strip()}\n\n"
