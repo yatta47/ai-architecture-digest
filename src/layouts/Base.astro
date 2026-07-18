@@ -1,0 +1,152 @@
+---
+import { getCollection } from 'astro:content';
+import { url, slugify } from '../lib/facets';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = 'AI Architecture 事例カタログ',
+  description = '追跡ソースの新着を、切り口で引ける事例カタログ。',
+} = Astro.props;
+
+// タブ = パターン軸（件数上位）。先頭に「新着(all)」。
+const all = await getCollection('cases');
+const counts = new Map<string, number>();
+for (const e of all) for (const p of e.data.patterns) counts.set(p, (counts.get(p) || 0) + 1);
+const tabs = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 9).map(([label]) => label);
+
+const path = Astro.url.pathname;
+const home = url('');
+const isHome = path === home || path.replace(/\/$/, '') === home.replace(/\/$/, '');
+const activeSlug = path.match(/\/patterns\/([^/]+)/)?.[1];
+const isExplore = /\/explore\/?$/.test(path);
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {/* GA4 gtag は公開直前にここへ入れる: config('G-XXXXXXXXXX') */}
+    <style is:global>
+      :root {
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --muted: #8a8a8a;
+        --link: #1a3d7c;
+        --sep: #ececec;
+        --tab: #555;
+        --tab-active: #111;
+        --accent: #2f6fb0;
+        --chip-bg: #f0f2f5;
+        --chip-text: #5b6472;
+        --topbar: #1c1c1e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        line-height: 1.6;
+      }
+      a { color: var(--link); text-decoration: none; }
+
+      .topbar { background: var(--topbar); color: #fff; display: flex; align-items: baseline; gap: 0.8rem; padding: 0.7rem 1.5rem; }
+      .topbar .logo { color: #fff; font-weight: 700; font-size: 1.12rem; }
+      .topbar .logo .mark { color: #57c98a; }
+      .topbar .tagline { color: #b9bcc2; font-size: 0.75rem; }
+
+      .tabs { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.1rem; border-bottom: 1px solid var(--sep); padding: 0 1rem; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+      .tab { padding: 0.65rem 0.8rem; color: var(--tab); font-size: 0.85rem; border-bottom: 2px solid transparent; white-space: nowrap; }
+      .tab:hover { color: var(--tab-active); }
+      .tab.active { color: var(--tab-active); border-bottom-color: var(--accent); font-weight: 600; }
+      .tab.explore { color: var(--accent); }
+
+      .wrap { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 2rem; }
+      .foot { color: var(--muted); font-size: 0.72rem; text-align: center; padding: 2rem 1rem; border-top: 1px solid var(--sep); }
+
+      h1.page { font-size: 1.25rem; margin: 0.4rem 0 0.15rem; }
+      .count { color: var(--muted); font-size: 0.8rem; margin: 0 0 0.7rem; }
+
+      /* feed list（menthas型） */
+      .feed-list { display: flex; flex-direction: column; }
+      .row { display: flex; gap: 1rem; padding: 1.05rem 0; border-bottom: 1px solid var(--sep); color: inherit; align-items: flex-start; }
+      .row:hover .row-title { color: var(--accent); }
+      .thumb { flex: 0 0 150px; height: 96px; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-between; padding: 0.4rem 0.5rem; overflow: hidden; }
+      .thumb-cloud { font-weight: 800; font-size: 0.95rem; color: #fff; letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+      .thumb-type { align-self: flex-start; font-size: 0.62rem; padding: 0.05rem 0.45rem; border-radius: 999px; background: rgba(255,255,255,0.88); color: #333; }
+      .cloud-aws { background: linear-gradient(135deg, #ff9900, #e07b00); }
+      .cloud-azure { background: linear-gradient(135deg, #2b88d8, #0063b1); }
+      .cloud-gcp { background: linear-gradient(135deg, #4285f4, #34a853); }
+      .cloud-none { background: linear-gradient(135deg, #9aa4b2, #6b7280); }
+      .row-body { flex: 1; min-width: 0; }
+      .row-title { margin: 0 0 0.25rem; font-size: 1.05rem; font-weight: 700; color: #16213e; line-height: 1.42; }
+      .row-meta { color: var(--muted); font-size: 0.76rem; margin-bottom: 0.25rem; }
+      .row-meta .new { color: #d33; font-weight: 700; margin-left: 0.3rem; }
+      .row-excerpt { color: #555; font-size: 0.83rem; margin: 0.15rem 0 0.35rem; }
+      @media (max-width: 620px) { .thumb { flex-basis: 90px; height: 66px; } .row-title { font-size: 0.98rem; } }
+
+      .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+      .chip { background: var(--chip-bg); color: var(--chip-text); border-radius: 999px; padding: 0.06rem 0.55rem; font-size: 0.72rem; }
+      .chip.pat { background: #e9f0fb; color: #2f5c9e; }
+      .chip.comp { background: #eef1f5; color: #4b5563; }
+      .chip.cloud { background: #fff1dd; color: #a15c00; }
+
+      .badge { border-radius: 999px; padding: 0.05rem 0.5rem; font-size: 0.66rem; font-weight: 600; color: #fff; }
+      .type-case { background: #2f6fb0; }
+      .type-guidance { background: #8a6d1f; }
+      .type-opinion { background: #9c3f57; }
+      .type-announcement { background: #3f8a63; }
+
+      .type-filter { display: flex; gap: 0.35rem; margin: 0.2rem 0 0.4rem; flex-wrap: wrap; }
+      .tf { background: var(--chip-bg); color: var(--chip-text); border: 1px solid var(--sep); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.76rem; cursor: pointer; }
+      .tf.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+      /* detail */
+      .detail-title { font-size: 1.5rem; margin: 0.3rem 0 0.1rem; color: #16213e; }
+      .detail .orig { color: var(--muted); font-size: 0.82rem; margin-top: 0; }
+      .detail .meta { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem; }
+      .facet-rows { margin: 1rem 0; display: grid; gap: 0.4rem; }
+      .facet-rows > div { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+      .facet-rows b { font-size: 0.72rem; color: var(--muted); min-width: 5.5rem; font-weight: 600; }
+      .facet-rows .chip { }
+      .detail .body { border-top: 1px solid var(--sep); padding-top: 1rem; margin-top: 1rem; font-size: 0.95rem; }
+      .detail .body h2 { font-size: 1.05rem; margin: 1.2rem 0 0.4rem; color: #16213e; }
+      .detail .body h2:first-child { margin-top: 0; }
+      .detail .body p { margin: 0.4rem 0; }
+      .src-link { margin-top: 1rem; }
+      .detail .facet-tags { border-top: 1px solid var(--sep); margin-top: 1.6rem; padding-top: 1rem; }
+      .detail .facet-tags .facet-heading { font-size: 0.82rem; margin: 0 0 0.6rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; }
+
+      /* explore */
+      .explore-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
+      .exp-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.35rem; border-bottom: 1px solid var(--sep); padding-bottom: 0.2rem; }
+      .exp-link { display: flex; justify-content: space-between; padding: 0.18rem 0.1rem; font-size: 0.85rem; }
+      .exp-link .c { color: var(--muted); font-size: 0.75rem; }
+
+      a.chip:hover { filter: brightness(0.96); }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="logo" href={url('')}><span class="mark">◆</span> AI Architecture Cases</a>
+      <span class="tagline">AIアーキテクチャ事例のキュレーション</span>
+    </header>
+    <nav class="tabs">
+      <a class={`tab ${isHome ? 'active' : ''}`} href={url('')}>新着</a>
+      {tabs.map((t) => (
+        <a class={`tab ${activeSlug === slugify(t) ? 'active' : ''}`} href={url(`patterns/${slugify(t)}`)}>{t}</a>
+      ))}
+      <a class={`tab explore ${isExplore ? 'active' : ''}`} href={url('explore')}>軸で探す ▾</a>
+    </nav>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="foot">出典は各記事のリンク先に帰属。要約は自動生成の二次コンテンツです。</footer>
+  </body>
+</html>

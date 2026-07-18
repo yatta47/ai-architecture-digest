@@ -1,0 +1,17 @@
+---
+import Base from '../../layouts/Base.astro';
+import CaseRow from '../../components/CaseRow.astro';
+import { allCases, facetPaths, accessors } from '../../lib/facets';
+
+export async function getStaticPaths() {
+  const entries = await allCases();
+  return facetPaths(entries, accessors['data-sources']);
+}
+const { label, items } = Astro.props;
+---
+
+<Base title={`データ種別: ${label}`}>
+  <h1 class="page">データ種別: {label}</h1>
+  <p class="count">{items.length}件</p>
+  <div class="feed-list">{items.map((e) => <CaseRow entry={e} />)}</div>
+</Base>

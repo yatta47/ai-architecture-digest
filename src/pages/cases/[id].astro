@@ -1,0 +1,65 @@
+---
+import Base from '../../layouts/Base.astro';
+import CaseRow from '../../components/CaseRow.astro';
+import { allCases, similarCases, url, slugify, plainExcerpt } from '../../lib/facets';
+import { render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const entries = await allCases();
+  return entries.map((e) => ({ params: { id: e.id }, props: { entry: e, all: entries } }));
+}
+
+const { entry, all } = Astro.props;
+const d = entry.data;
+const { Content } = await render(entry);
+const similar = similarCases(entry, all);
+---
+
+<Base title={d.title} description={plainExcerpt(entry.body, 120)}>
+  <article class="detail">
+    <div class="meta">
+      <span class={`badge type-${d.type}`}>{d.type}</span>
+      {d.source_name && <span>{d.source_name}</span>}
+      <span>{d.published_at}</span>
+    </div>
+    <h1 class="detail-title">{d.title}</h1>
+    {d.title_original && <p class="orig">{d.title_original}</p>}
+
+    <div class="body"><Content /></div>
+    <p class="src-link"><a href={d.source_url} target="_blank" rel="noopener">出典を読む →</a></p>
+
+    <div class="facet-tags">
+      <div class="facet-heading">タグ</div>
+      <div class="facet-rows">
+        {d.company && (
+          <div><b>企業</b><a class="chip" href={url(`companies/${slugify(d.company)}`)}>{d.company}</a></div>
+        )}
+        {d.industry && (
+          <div><b>業界</b><a class="chip" href={url(`industries/${slugify(d.industry)}`)}>{d.industry}</a></div>
+        )}
+        {d.cloud.length > 0 && (
+          <div><b>クラウド</b>{d.cloud.map((x) => <a class="chip cloud" href={url(`cloud/${slugify(x)}`)}>{x}</a>)}</div>
+        )}
+        {d.patterns.length > 0 && (
+          <div><b>パターン</b>{d.patterns.map((x) => <a class="chip pat" href={url(`patterns/${slugify(x)}`)}>{x}</a>)}</div>
+        )}
+        {d.components.length > 0 && (
+          <div><b>技術スタック</b>{d.components.map((x) => <a class="chip comp" href={url(`components/${slugify(x)}`)}>{x}</a>)}</div>
+        )}
+        {d.data_sources.length > 0 && (
+          <div><b>データ</b>{d.data_sources.map((x) => <a class="chip" href={url(`data-sources/${slugify(x)}`)}>{x}</a>)}</div>
+        )}
+        {d.outcome && (
+          <div><b>成果</b><a class="chip" href={url(`outcomes/${slugify(d.outcome.type)}`)}>{d.outcome.type}</a></div>
+        )}
+      </div>
+    </div>
+  </article>
+
+  {similar.length > 0 && (
+    <section class="similar">
+      <h2 class="page">類似事例</h2>
+      <div class="feed-list">{similar.map((s) => <CaseRow entry={s.entry} />)}</div>
+    </section>
+  )}
+</Base>

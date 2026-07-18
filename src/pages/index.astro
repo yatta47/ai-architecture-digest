@@ -1,0 +1,34 @@
+---
+import Base from '../layouts/Base.astro';
+import CaseRow from '../components/CaseRow.astro';
+import { allCases } from '../lib/facets';
+
+const entries = await allCases();
+const types = ['case', 'guidance', 'opinion', 'announcement'];
+---
+
+<Base>
+  <div class="type-filter">
+    <button class="tf active" data-type="all">すべて</button>
+    {types.map((t) => <button class="tf" data-type={t}>{t}</button>)}
+  </div>
+  <div class="feed-list" id="feed">
+    {entries.map((e) => (
+      <div class="feed-item" data-type={e.data.type}>
+        <CaseRow entry={e} />
+      </div>
+    ))}
+  </div>
+  <script is:inline>
+    document.querySelectorAll('.tf').forEach((b) => {
+      b.addEventListener('click', () => {
+        const t = b.getAttribute('data-type');
+        document.querySelectorAll('.tf').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        document.querySelectorAll('.feed-item').forEach((it) => {
+          it.style.display = t === 'all' || it.getAttribute('data-type') === t ? '' : 'none';
+        });
+      });
+    });
+  </script>
+</Base>
