@@ -9,11 +9,16 @@ export async function GET(context) {
     title: 'AI Architecture 事例カタログ',
     description: '追跡ソースの新着を切り口で引ける事例カタログ',
     site: context.site,
-    items: cases.map((e) => ({
-      title: e.data.title,
-      pubDate: new Date(e.data.published_at),
-      description: plainExcerpt(e.body, 200),
-      link: `/cases/${e.id}/`,
-    })),
+    items: cases.map((e) => {
+      const item = {
+        title: e.data.title,
+        description: plainExcerpt(e.body, 200),
+        link: `/cases/${e.id}/`,
+      };
+      // published_at が欠損/不正な生成エントリでも RSS を壊さない
+      const d = e.data.published_at ? new Date(e.data.published_at) : null;
+      if (d && !Number.isNaN(d.getTime())) item.pubDate = d;
+      return item;
+    }),
   });
 }

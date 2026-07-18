@@ -51,11 +51,14 @@ UA = "Mozilla/5.0 (compatible; ai-architecture-digest/0.1)"
 
 MONTHS = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
+MONTHS.update({m: i for i, m in enumerate(
+    ["January", "February", "March", "April", "May", "June", "July", "August",
+     "September", "October", "November", "December"], 1)})
 MONTHS["Sept"] = 9
 LOC_RE = re.compile(r"<loc>([^<]+)</loc>")
 JSONLD_DATE_RE = re.compile(r'"datePublished"\s*:\s*"([^"]+)"')
-INTEXT_DATE_RE = re.compile(
-    r"\b(Sept|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20\d\d)\b")
+# 3文字略称・フル月名・Sept を許容（"Jul 15, 2026" / "July 15, 2026" / "Sept 1, 2026"）
+INTEXT_DATE_RE = re.compile(r"\b([A-Z][a-z]{2,8})\.?\s+(\d{1,2}),?\s+(20\d\d)\b")
 
 
 def log(*a):
