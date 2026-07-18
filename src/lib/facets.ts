@@ -2,12 +2,15 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 
 export type CaseEntry = CollectionEntry<'cases'>;
 
-/** URL 安全な slug に落とす（表示ラベルは別途保持する） */
+/** URL 安全な slug に落とす（表示ラベルは別途保持する）。
+ * Unicode 文字/数字は保持する（\p{L}\p{N}）＝日本語の data_sources 等が
+ * 全て空→'item' に潰れて1ページに合流するバグを防ぐ。ASCII の挙動は従来と同じ。 */
 export function slugify(s: string): string {
   const out = s
+    .normalize('NFC') // NFD混入(結合文字)で「か/が」等が別slugに分裂/合流するのを防ぐ
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
   return out || 'item';
 }
@@ -42,9 +45,12 @@ export const accessors: Record<string, Accessor> = {
 export function facetPaths(entries: CaseEntry[], accessor: Accessor) {
   const map = new Map<string, { label: string; items: CaseEntry[] }>();
   for (const e of entries) {
+    const seen = new Set<string>(); // 同一記事が複数ラベル→同一slugでも1回だけ入れる
     for (const label of accessor(e)) {
       if (!label) continue;
       const slug = slugify(label);
+      if (seen.has(slug)) continue;
+      seen.add(slug);
       if (!map.has(slug)) map.set(slug, { label, items: [] });
       map.get(slug)!.items.push(e);
     }
@@ -59,9 +65,12 @@ export function facetPaths(entries: CaseEntry[], accessor: Accessor) {
 export function facetSummary(entries: CaseEntry[], accessor: Accessor) {
   const map = new Map<string, { label: string; count: number }>();
   for (const e of entries) {
+    const seen = new Set<string>(); // 件数は「記事数」＝同一記事の重複カウントを防ぐ
     for (const label of accessor(e)) {
       if (!label) continue;
       const slug = slugify(label);
+      if (seen.has(slug)) continue;
+      seen.add(slug);
       if (!map.has(slug)) map.set(slug, { label, count: 0 });
       map.get(slug)!.count++;
     }
