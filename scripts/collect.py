@@ -27,11 +27,13 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import re
 import sqlite3
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -228,18 +230,35 @@ def parse_any_date(html: str, text: str) -> str:
     return ""
 
 
-# ================= non-RSS discovery（catalog 移植） =================
-def discover_claude_blog() -> list[str]:
+# ================= non-RSS discovery（catalog ロジックを移植） =================
+# discoverer は {"url":..(必須).., "title":..(任意).., "date":..(任意)..} の list を返す。
+# title/date が取れないソースは fetch_page 側でページから補完する。newest-first で返すのが望ましい。
+AZURE_LANDING = "https://learn.microsoft.com/en-us/azure/architecture/"
+AWS_API = "https://aws.amazon.com/api/dirs/items/search"
+AWS_DIRECTORY = "directory-migration-cards-interactive-alias-architecture-center"
+NON_HTML_EXT = (".pdf", ".zip", ".docx", ".pptx", ".xlsx")
+NON_ARTICLE_DOMAINS = {
+    "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+    "linkedin.com", "www.linkedin.com",
+}
+
+
+def is_non_article(url: str) -> bool:
+    p = urllib.parse.urlsplit(url)
+    return p.netloc.lower() in NON_ARTICLE_DOMAINS or p.path.lower().endswith(NON_HTML_EXT)
+
+
+def discover_claude_blog() -> list[dict]:
     xml = fetch_bytes("https://claude.com/sitemap.xml").decode("utf-8", errors="ignore")
     out, seen = [], set()
     for loc in LOC_RE.findall(xml):
         loc = loc.strip()
         if loc.startswith("https://claude.com/blog/") and loc not in seen:
-            seen.add(loc); out.append(loc)
+            seen.add(loc); out.append({"url": loc})
     return out
 
 
-def discover_llamaindex_blog() -> list[str]:
+def discover_llamaindex_blog() -> list[dict]:
     html = fetch_bytes("https://www.llamaindex.ai/blog").decode("utf-8", errors="ignore")
     out, seen = [], set()
     for path in re.findall(r'href="(/blog/[^"#?]+)"', html):
@@ -247,11 +266,83 @@ def discover_llamaindex_blog() -> list[str]:
             continue
         u = "https://www.llamaindex.ai" + path
         if u not in seen:
-            seen.add(u); out.append(u)
+            seen.add(u); out.append({"url": u})
     return out
 
 
-DISCOVERERS = {"claude-blog": discover_claude_blog, "llamaindex-blog": discover_llamaindex_blog}
+def discover_aws_architecture_center() -> list[dict]:
+    # 内部API（非公開）。title/date/url を直接返す。新しい順（dateCreated desc）。
+    params = {
+        "item.directoryId": AWS_DIRECTORY, "item.locale": "en_US",
+        "sort_by": "item.dateCreated", "sort_order": "desc", "size": "50",
+    }
+    req = urllib.request.Request(
+        f"{AWS_API}?{urllib.parse.urlencode(params)}",
+        headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.load(r)
+    out = []
+    for e in data.get("items", []):
+        f = e.get("item", {}).get("additionalFields", {})
+        title, link = f.get("title") or f.get("heading"), f.get("ctaLink")
+        if not title or not link or is_non_article(link):
+            continue
+        raw = f.get("publishedDate") or f.get("date") or ""
+        out.append({"url": link, "title": title, "date": raw[:10] if raw else ""})
+    return out
+
+
+def discover_azure_architecture_center() -> list[dict]:
+    # learn.microsoft.com の azure_en-us_*.xml（7分割・plain XML・lastmod あり）→ /en-us/azure/architecture/。
+    idx = fetch_bytes("https://learn.microsoft.com/_sitemaps/sitemapindex.xml").decode("utf-8", errors="ignore")
+    sub_re = re.compile(r"^https://learn\.microsoft\.com/_sitemaps/azure_en-us_\d+\.xml$")
+    subs = [l for l in LOC_RE.findall(idx) if sub_re.match(l)]
+    dated, seen = [], set()
+    for sm in subs:
+        try:
+            xml = fetch_bytes(sm).decode("utf-8", errors="ignore")
+        except Exception as e:
+            log("  fail-sitemap", sm, type(e).__name__); continue
+        for block in xml.split("<url>")[1:]:
+            m = LOC_RE.search(block)
+            if not m:
+                continue
+            loc = m.group(1).strip()
+            if "/en-us/azure/architecture/" not in loc or loc == AZURE_LANDING or loc in seen:
+                continue
+            seen.add(loc)
+            lm = re.search(r"<lastmod>([^<]*)</lastmod>", block)
+            dated.append((lm.group(1) if lm else "", loc))
+    dated.sort(key=lambda p: p[0], reverse=True)
+    return [{"url": u, "date": norm_date(d)} for d, u in dated]
+
+
+def discover_gcp_architecture_center() -> list[dict]:
+    # docs.cloud.google.com/sitemap.xml（60分割 gzip）→ /architecture/。lastmod無し（日付はページから補完）。
+    idx = fetch_bytes("https://docs.cloud.google.com/sitemap.xml").decode("utf-8", errors="ignore")
+    out, seen = [], set()
+    for sm in LOC_RE.findall(idx):
+        try:
+            raw = fetch_bytes(sm)
+        except Exception as e:
+            log("  fail-sitemap", sm, type(e).__name__); continue
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        for loc in LOC_RE.findall(raw.decode("utf-8", errors="ignore")):
+            if "/architecture/" in loc and "hl=" not in loc and loc not in seen:
+                seen.add(loc); out.append({"url": loc})
+        if len(out) >= 200:  # 早期打ち切り（全60分割は重い・日付が無く順序も任意のため）
+            break
+    return out
+
+
+DISCOVERERS = {
+    "claude-blog": discover_claude_blog,
+    "llamaindex-blog": discover_llamaindex_blog,
+    "aws-architecture-center": discover_aws_architecture_center,
+    "azure-architecture-center": discover_azure_architecture_center,
+    "google-cloud-architecture-center": discover_gcp_architecture_center,
+}
 
 
 # ================= fetch =================
@@ -263,7 +354,7 @@ def _fetch_rss(con, s, args) -> int:
     feed.sort(key=lambda x: x["date"], reverse=True)
     added = 0
     for it in feed[: args.limit]:
-        if not it["link"] or not it["title"] or db_has_url(con, it["link"]):
+        if not it["link"] or not it["title"] or is_non_article(it["link"]) or db_has_url(con, it["link"]):
             continue
         if args.dry_run:
             log("  would add", it["title"][:60]); continue
@@ -278,22 +369,24 @@ def _fetch_rss(con, s, args) -> int:
 
 def _fetch_nonrss(con, s, args) -> int:
     try:
-        urls = DISCOVERERS[s["id"]]()
+        items = DISCOVERERS[s["id"]]()
     except Exception as e:
         log("skip", s["id"], type(e).__name__, e); return 0
-    to_fetch = [u for u in urls if not db_has_url(con, u)][: (args.max_fetch or 30)]
-    log(f"  {s['id']}: {len(urls)} urls found, fetching {len(to_fetch)} for metadata")
-    items = []
-    for u in to_fetch:
+    fresh = [it for it in items if not db_has_url(con, it["url"]) and not is_non_article(it["url"])][: (args.max_fetch or 30)]
+    log(f"  {s['id']}: {len(items)} urls found, fetching {len(fresh)} for content")
+    got = []
+    for it in fresh:
         try:
-            title, date, text = fetch_page(u)
+            ptitle, pdate, text = fetch_page(it["url"])
         except Exception as e:
-            log("  page-fail", u, type(e).__name__); continue
+            log("  page-fail", it["url"], type(e).__name__); continue
+        title = it.get("title") or ptitle
+        date = it.get("date") or pdate
         if title:
-            items.append((title, u, date, text))
-    items.sort(key=lambda x: x[2], reverse=True)
+            got.append((title, it["url"], date, text))
+    got.sort(key=lambda x: x[2] or "", reverse=True)
     added = 0
-    for title, u, date, text in items[: args.limit]:
+    for title, u, date, text in got[: args.limit]:
         if args.dry_run:
             log("  would add", title[:55], date); continue
         if db_insert_fetched(con, s, title, u, date, text):
