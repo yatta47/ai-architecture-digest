@@ -3,7 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 export type CaseEntry = CollectionEntry<'cases'>;
 
 /** URL 安全な slug に落とす（表示ラベルは別途保持する）。
- * Unicode 文字/数字は保持する（\p{L}\p{N}）＝日本語の data_sources 等が
+ * Unicode 文字/数字は保持する（\p{L}\p{N}）＝日本語のファセット値が
  * 全て空→'item' に潰れて1ページに合流するバグを防ぐ。ASCII の挙動は従来と同じ。 */
 export function slugify(s: string): string {
   const out = s
@@ -35,7 +35,6 @@ export const accessors: Record<string, Accessor> = {
   cloud: (e) => e.data.cloud,
   patterns: (e) => e.data.patterns,
   components: (e) => e.data.components,
-  'data-sources': (e) => e.data.data_sources,
   industries: (e) => (e.data.industry ? [e.data.industry] : []),
   companies: (e) => (e.data.company ? [e.data.company] : []),
   outcomes: (e) => (e.data.outcome?.type ? [e.data.outcome.type] : []),
@@ -96,12 +95,11 @@ function tagsOf(e: CaseEntry): Set<string> {
   e.data.cloud.forEach((x) => t.add('cloud:' + slugify(x)));
   e.data.patterns.forEach((x) => t.add('pat:' + slugify(x)));
   e.data.components.forEach((x) => t.add('comp:' + slugify(x)));
-  e.data.data_sources.forEach((x) => t.add('ds:' + slugify(x)));
   if (e.data.industry) t.add('ind:' + slugify(e.data.industry));
   return t;
 }
 
-/** 類似事例: cloud/patterns/components/data_sources/industry の重み付きJaccardで算出（AI不要） */
+/** 類似事例: cloud/patterns/components/industry の重み付きJaccardで算出（AI不要） */
 export function similarCases(target: CaseEntry, all: CaseEntry[], n = 3) {
   const t = tagsOf(target);
   return all

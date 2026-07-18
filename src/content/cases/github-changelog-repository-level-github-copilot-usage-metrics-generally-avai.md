@@ -13,10 +13,6 @@ components:
 - Copilot coding agent
 - Copilot code review
 - GitHub Copilot usage metrics REST API
-data_sources:
-- プルリクエスト活動
-- コードレビュー提案数
-- リポジトリ別利用状況
 outcome:
   type: productivity
 source_id: github-changelog

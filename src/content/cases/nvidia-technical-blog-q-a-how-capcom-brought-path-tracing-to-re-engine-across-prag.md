@@ -8,7 +8,6 @@ industry: media
 cloud: []
 patterns: []
 components: []
-data_sources: []
 outcome:
   type: quality
 source_id: nvidia-technical-blog

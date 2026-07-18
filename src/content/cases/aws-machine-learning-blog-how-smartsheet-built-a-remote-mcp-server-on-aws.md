@@ -30,12 +30,6 @@ components:
 - OpenTelemetry
 - Datadog
 - PagerDuty
-data_sources:
-- プロジェクトデータ
-- タスク
-- シート
-- ワークスペース
-- 変更イベント
 outcome:
   type: cost
 source_id: aws-machine-learning-blog

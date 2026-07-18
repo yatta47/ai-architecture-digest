@@ -17,10 +17,6 @@ components:
 - PyTorch
 - TensorFlow
 - Jupyter
-data_sources:
-- Kubernetes APIリソース
-- CRD
-- Podステータス
 outcome:
   type: productivity
 source_id: kubernetes-blog

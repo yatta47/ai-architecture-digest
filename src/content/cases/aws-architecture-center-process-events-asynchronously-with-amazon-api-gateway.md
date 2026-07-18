@@ -16,10 +16,6 @@ components:
 - Amazon EventBridge
 - Amazon SNS
 - AWS CDK
-data_sources:
-- ジョブパラメータ
-- イベント
-- ジョブ結果
 outcome:
   type: reliability
 source_id: aws-architecture-center

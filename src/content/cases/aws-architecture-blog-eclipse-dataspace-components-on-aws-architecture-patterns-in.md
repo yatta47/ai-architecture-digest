@@ -28,11 +28,6 @@ components:
 - Amazon CloudWatch
 - AWS Lambda
 - Amazon EventBridge
-data_sources:
-- 共有データ資産
-- 第三者受領データ
-- OAuth認証情報
-- 制御プレーンデータ
 outcome:
   type: risk-compliance
 source_id: aws-architecture-blog

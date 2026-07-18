@@ -12,10 +12,6 @@ components:
 - Amazon Quick
 - Amazon Quick mobile app
 - Free Form dashboards
-data_sources:
-- KPI
-- 業務メトリクス
-- チャート
 outcome:
   type: productivity
 source_id: aws-machine-learning-blog

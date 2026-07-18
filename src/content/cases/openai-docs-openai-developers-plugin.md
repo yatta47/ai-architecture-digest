@@ -16,9 +16,6 @@ components:
 - Responses API
 - Claude Code
 - Cursor
-data_sources:
-- OpenAI公式ドキュメント
-- プロジェクトAPIキー
 outcome:
   type: productivity
 source_id: openai-docs

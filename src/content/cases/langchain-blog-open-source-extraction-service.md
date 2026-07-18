@@ -15,11 +15,6 @@ components:
 - GPT-3.5-turbo
 - Pydantic
 - JSON Schema
-data_sources:
-- PDF
-- HTML
-- テキスト文書
-- 決算発表トランスクリプト
 outcome:
   type: productivity
 source_id: langchain-blog

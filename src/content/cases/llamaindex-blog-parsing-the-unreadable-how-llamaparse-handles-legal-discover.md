@@ -13,13 +13,6 @@ components:
 - Relativity
 - Everlaw
 - DISCO
-data_sources:
-- スキャンPDF
-- 写真
-- スライド資料
-- 表
-- 手書き注記
-- メール
 outcome:
   type: quality
 source_id: llamaindex-blog

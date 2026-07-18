@@ -502,7 +502,6 @@ def build_prompt(row, vocab: dict) -> str:
   "cloud": ["cloudから該当するもの（複数可・無ければ空配列）"],
   "patterns": ["patternsから該当するもの1〜4個"],
   "components": ["記事に出てくる具体的なサービス/製品名（例: Amazon Bedrock, OpenSearch）。無ければ空配列"],
-  "data_sources": ["システムが扱うデータ種別の短い語。無ければ空配列"],
   "outcome": {{"type": "outcomesから1つ"}},
   "summary": "『## 概要』に入れる2〜3文の日本語要約",
   "design_point": ["『## 設計のポイント』の箇条書き。再利用できる設計判断を1項目ずつ、2〜4個（各項目1文程度・文字列の配列）"],
@@ -512,7 +511,7 @@ def build_prompt(row, vocab: dict) -> str:
 判定の指針:
 - type: 具体的な実装事例=case / 手引き・リファレンス=guidance / 意見・考察=opinion / 提供開始・機能告知=announcement
 - 具体的な構成が読み取れない記事でも type で分類して出す（事例以外は company/components が空でよい）
-- ai_relevant=false（非AI）のときは深掘りファセットを無理に埋めない: patterns / components / data_sources は空配列、design_point / use_case は空配列でよい。
+- ai_relevant=false（非AI）のときは深掘りファセットを無理に埋めない: patterns / components は空配列、design_point / use_case は空配列でよい。
   ただし summary（概要）と company / industry / cloud / outcome は通常どおり埋める（網羅カバレッジ用の軽量カードになる）。
 
 語彙（できるだけこの中から選ぶ。適切な語が無ければ新しい語を作ってよい）:
@@ -559,7 +558,7 @@ def _as_bool(v, default: bool = True) -> bool:
 
 def write_case(row, data: dict) -> Path:
     # カバレッジ優先度: 非AI(ai_relevant=false)は概要＋汎用タグのみの軽量カードにする。
-    # 深掘りファセット(patterns/components/data_sources)と 設計/使いどころは AI関連のみ。
+    # 深掘りファセット(patterns/components)と 設計/使いどころは AI関連のみ。
     ai_relevant = _as_bool(data.get("ai_relevant"), True)
     fm = {
         "type": data.get("type", "case"),
@@ -576,7 +575,6 @@ def write_case(row, data: dict) -> Path:
     fm["cloud"] = _as_list(data.get("cloud"))
     fm["patterns"] = _as_list(data.get("patterns")) if ai_relevant else []
     fm["components"] = _as_list(data.get("components")) if ai_relevant else []
-    fm["data_sources"] = _as_list(data.get("data_sources")) if ai_relevant else []
     if ((data.get("outcome") or {}).get("type") or "").strip():
         fm["outcome"] = {"type": data["outcome"]["type"].strip()}
     fm["source_id"] = row["source_id"]

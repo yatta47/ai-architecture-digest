@@ -11,11 +11,6 @@ components:
 - GitHub Copilot
 - Copilot usage metrics API
 - GitHub Copilot app
-data_sources:
-- 利用メトリクス
-- トークン使用量
-- セッション・リクエスト数
-- アクティブユーザー数
 outcome:
   type: cost
 source_id: github-changelog

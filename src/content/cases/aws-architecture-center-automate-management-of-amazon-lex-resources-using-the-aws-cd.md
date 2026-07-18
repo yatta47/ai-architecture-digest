@@ -16,9 +16,6 @@ components:
 - AWS CLI
 - AWS SDK for Python (Boto3)
 - Git
-data_sources:
-- ボット定義(IaC)
-- 会話フロー設定
 outcome:
   type: productivity
 source_id: aws-architecture-center
