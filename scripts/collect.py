@@ -434,6 +434,7 @@ def build_prompt(row, vocab: dict) -> str:
 次のキーを持つJSONを出力:
 {{
   "type": "case|guidance|opinion|announcement",
+  "ai_relevant": true または false（true=AIアーキ(LLM/ML/エージェント/RAG/ベクトル検索/モデル配信/AI基盤運用)が記事の構成の中心 / false=周辺技術が主題: 3Dグラフィックス・レイトレ/量子/汎用インフラ運用/カンファレンス報告など）,
   "title": "日本語の再構成タイトル（記事名の直訳でなく『何のシステム/話か』を一言で）",
   "title_original": "元記事タイトル（英語のまま）",
   "company": "実装主体の企業名。無ければ空文字",
@@ -451,6 +452,8 @@ def build_prompt(row, vocab: dict) -> str:
 判定の指針:
 - type: 具体的な実装事例=case / 手引き・リファレンス=guidance / 意見・考察=opinion / 提供開始・機能告知=announcement
 - 具体的な構成が読み取れない記事でも type で分類して出す（事例以外は company/components が空でよい）
+- ai_relevant=false（非AI）のときは深掘りファセットを無理に埋めない: patterns / components / data_sources は空配列、design_point / use_case は空文字でよい。
+  ただし summary（概要）と company / industry / cloud / outcome は通常どおり埋める（網羅カバレッジ用の軽量カードになる）。
 
 語彙（できるだけこの中から選ぶ。適切な語が無ければ新しい語を作ってよい）:
 - types: {vocab['types']}
@@ -484,20 +487,36 @@ def _as_list(v) -> list[str]:
     return []
 
 
+def _as_bool(v, default: bool = True) -> bool:
+    if isinstance(v, bool):  # bool は int のサブクラスなので数値判定より前に見る
+        return v
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "yes", "1")
+    if isinstance(v, (int, float)):  # LLM が 0/1 を返すケース（0=false を黙ってtrueにしない）
+        return bool(v)
+    return default
+
+
 def write_case(row, data: dict) -> Path:
+    # カバレッジ優先度: 非AI(ai_relevant=false)は概要＋汎用タグのみの軽量カードにする。
+    # 深掘りファセット(patterns/components/data_sources)と 設計/使いどころは AI関連のみ。
+    ai_relevant = _as_bool(data.get("ai_relevant"), True)
     fm = {
         "type": data.get("type", "case"),
         "title": data.get("title", row["title"]),
         "title_original": data.get("title_original", row["title"]),
     }
+    # 既定 true（スキーマ default）なので、軽量カード(false)のときだけ明示する＝既存フルカードの差分を出さない
+    if not ai_relevant:
+        fm["ai_relevant"] = False
     if (data.get("company") or "").strip():
         fm["company"] = data["company"].strip()
     if (data.get("industry") or "").strip():
         fm["industry"] = data["industry"].strip()
     fm["cloud"] = _as_list(data.get("cloud"))
-    fm["patterns"] = _as_list(data.get("patterns"))
-    fm["components"] = _as_list(data.get("components"))
-    fm["data_sources"] = _as_list(data.get("data_sources"))
+    fm["patterns"] = _as_list(data.get("patterns")) if ai_relevant else []
+    fm["components"] = _as_list(data.get("components")) if ai_relevant else []
+    fm["data_sources"] = _as_list(data.get("data_sources")) if ai_relevant else []
     if ((data.get("outcome") or {}).get("type") or "").strip():
         fm["outcome"] = {"type": data["outcome"]["type"].strip()}
     fm["source_id"] = row["source_id"]
@@ -505,11 +524,14 @@ def write_case(row, data: dict) -> Path:
     fm["source_url"] = row["url"]
     # 公開日が抽出できなければ取得日(fetched_at)にフォールバック（空欄を作らない）
     fm["published_at"] = row["published"] or (row["fetched_at"] or "")[:10]
-    body = (
-        f"## 概要\n\n{data.get('summary','').strip()}\n\n"
-        f"## 設計のポイント\n\n{data.get('design_point','').strip()}\n\n"
-        f"## 使いどころ\n\n{data.get('use_case','').strip()}\n"
-    )
+    if ai_relevant:
+        body = (
+            f"## 概要\n\n{data.get('summary','').strip()}\n\n"
+            f"## 設計のポイント\n\n{data.get('design_point','').strip()}\n\n"
+            f"## 使いどころ\n\n{data.get('use_case','').strip()}\n"
+        )
+    else:
+        body = f"## 概要\n\n{data.get('summary','').strip()}\n"
     front = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, width=120).strip()
     CASES_DIR.mkdir(parents=True, exist_ok=True)
     path = CASES_DIR / f"{row['id']}.md"

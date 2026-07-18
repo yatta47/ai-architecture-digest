@@ -24,6 +24,7 @@ const isNew = Date.now() - new Date(d.published_at).getTime() < 14 * 864e5;
     <div class="row-meta">
       from: {metaBits.join(' · ')}
       {isNew && <span class="new">New!</span>}
+      {d.ai_relevant === false && <span class="cov">概要のみ</span>}
     </div>
     {excerpt && <p class="row-excerpt">{excerpt}…</p>}
     <div class="chips">

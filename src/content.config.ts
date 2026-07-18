@@ -7,6 +7,9 @@ const cases = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/cases' }),
   schema: z.object({
     type: z.enum(['case', 'guidance', 'opinion', 'announcement']),
+    // カバレッジ優先度: ソースは網羅的に取り込み、AI関連(true)だけ深掘りしてフルカードにする。
+    // false=非AI（周辺技術）は概要＋汎用タグのみの軽量カード。既定 true（既存カードは無指定=フル）。
+    ai_relevant: z.boolean().default(true),
     title: z.string(), // 日本語の再構成タイトル（記事名の和訳ではない）
     title_original: z.string().optional(),
     company: z.string().optional(), // 実装主体（cloud基盤とは別）。事例以外は無くてよい
