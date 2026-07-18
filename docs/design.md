@@ -119,41 +119,47 @@ SQLite の `articles` テーブルが収集処理の状態を保持する。
 | `url` | UNIQUE、原記事 URL。主要な重複判定キー |
 | `source_id`, `source_name`, `tier` | 取得元メタデータ |
 | `title`, `published`, `text`, `vendors` | 取得した記事情報 |
-| `status` | `fetched`, `generated`, `error` |
+| `status` | `fetched`, `generating`, `generated`, `error` |
 | `case_path` | 生成した Markdown の相対パス |
 | `fetched_at`, `generated_at` | UTC ISO 8601 の処理日時 |
 | `error` | 生成失敗内容。最大 300 文字を保存 |
+| `retry_count` | LLM生成を試行した回数 |
+| `last_attempt_at` | 最後に生成を試行したUTC日時 |
 
-`status` と `source_id` に索引を持つ。DB 初期化時には既存 Markdown の `source_url` を読み取り、台帳に存在しないものを `generated` として逆輸入する。これによりローカル DB を削除しても、コミット済み事例の重複生成を防ぐ。
+`status` と `source_id` に索引を持つ。DB接続時には既存Markdownの`source_url`を読み取り、台帳への新規登録に加え、既存行も`generated`へ同期する。これによりDB削除時だけでなく、別worktreeなどでMarkdownだけが追加された場合も重複生成を防ぐ。
 
 ```mermaid
 stateDiagram-v2
     [*] --> fetched: fetch 成功
-    fetched --> generated: LLM 生成・Markdown 書込成功
-    fetched --> error: LLM 実行または JSON 解析失敗
+    fetched --> generating: 生成ワーカーがclaim
+    generating --> generated: LLM 生成・Markdown 書込成功
+    generating --> error: LLM実行・JSON解析・書込失敗
+    error --> fetched: retry
+    generating --> fetched: retry --include-generating
     generated --> [*]
-    error --> [*]
 ```
 
-現行実装には `error` から `fetched` へ戻す再試行コマンドはない。再試行する場合は台帳の状態を運用者が修正するか、実装を追加する必要がある。
+生成対象のclaimは`BEGIN IMMEDIATE`トランザクションで行い、選択した行を先に`generating`へ変更する。複数ワーカーが同じ`fetched`記事を同時に処理することを防ぐ。異常終了で残った`generating`は、他ワーカーが動いていないことを確認してから明示的に再試行する。
 
 ## 6. 収集・生成処理
 
 ### 6.1 コマンド
 
 ```bash
-python scripts/collect.py fetch [--source ID] [--limit N] [--max-fetch M] [--dry-run]
+python scripts/collect.py fetch [--source ID] [--max-new-per-source N] [--max-total N] [--max-fetch M] [--dry-run]
 python scripts/collect.py generate [--limit N] [--dry-run]
+python scripts/collect.py retry [--limit N] [--include-generating]
 python scripts/collect.py status
-python scripts/collect.py run [--source ID] [--limit N] [--max-fetch M] [--dry-run]
+python scripts/collect.py run [--source ID] [--max-new-per-source N] [--max-total N] [--max-fetch M] [--generate-limit N] [--dry-run]
 ```
 
 - `fetch`: 対象記事を検出し、本文を抽出して `fetched` として台帳へ登録する。
-- `generate`: 本文がある `fetched` 記事を新しい順に Claude CLI へ渡し、Markdown を生成する。
+- `generate`: 本文がある`fetched`記事を排他的にclaimし、公開日が新しい順でClaude CLIへ渡す。
+- `retry`: `error`記事を`fetched`へ戻す。`--include-generating`指定時は異常終了した処理中記事も戻す。
 - `status`: status 別・source 別の件数を表示する。
 - `run`: `fetch` と `generate` を順番に実行する。
 
-`--limit` は RSS ではフィードから処理する上限、非 RSS では本文取得後に登録する上限である。非 RSS の `--max-fetch` は、未知 URL に対して本文取得を試みる上限であり、通信量を抑える役割を持つ。
+`fetch`の既定値は1ソース最大50件、全体最大500件である。RSSはフィード全体から未知URLを探すため、先頭の既知記事によって後続の新着を見落とさない。非RSSの`--max-fetch`は本文取得を試みる上限で、既定100件とする。`generate`は全体で既定3件を処理する。互換性のため`fetch`と`run`の`--limit`は`--max-new-per-source`の別名として受け付ける。
 
 ### 6.2 取得方式
 
@@ -177,13 +183,14 @@ sequenceDiagram
     participant DB as SQLite
     participant Claude as Claude CLI
     participant FS as cases/*.md
-    CLI->>DB: status=fetched、本文ありを公開日降順で取得
+    CLI->>DB: BEGIN IMMEDIATEでfetchedをclaim
+    CLI->>DB: status=generating、retry_countを更新
     loop 記事ごと
         CLI->>Claude: 記事メタ、本文、分類語彙を送信
         Claude-->>CLI: JSON オブジェクト
         CLI->>CLI: JSON 抽出・配列正規化
         CLI->>FS: Frontmatter と本文を書込み
-        CLI->>DB: status=generated、case_path、generated_at
+        CLI->>DB: 成功ならgenerated、失敗ならerror
     end
 ```
 
@@ -304,7 +311,7 @@ npm run preview
 
 推奨する更新手順は次のとおりである。
 
-1. `fetch` を少数の `--limit` または特定の `--source` で実行する。
+1. `fetch`を既定上限、または特定の`--source`で実行し、SQLiteへ新着を蓄積する。
 2. `status` で取得件数を確認する。
 3. `generate --limit N` で Markdown を生成する。
 4. 生成されたタイトル、分類、要約、出典 URL、公開日を人手でレビューする。
@@ -342,7 +349,7 @@ npm run preview
 優先度順ではなく、現行設計上の論点として列挙する。
 
 - Python 依存関係がファイルで固定されておらず、環境再現性が限定的である。
-- `error` 記事の再試行、台帳の修復、生成済み記事の再生成を行う CLI がない。
+- 意図的に生成済み記事を再生成する専用CLIはない。
 - LLM 出力は JSON と一部の型だけを補正し、Content Collection と同等のスキーマ検証を生成直後には行わない。
 - 語彙と Content Collection の値を照合しないため、表記揺れや slug 衝突をビルドで検出できない。
 - 日本語のみのファセット値は `item` に正規化され、複数値が衝突する可能性がある。
