@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import CaseRow from '../../components/CaseRow.astro';
 import { allCases, similarCases, url, slugify, plainExcerpt } from '../../lib/facets';
+import { label } from '../../lib/labels';
 import { render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -36,7 +37,7 @@ const similar = similarCases(entry, all);
           <div><b>企業</b><a class="chip" href={url(`companies/${slugify(d.company)}`)}>{d.company}</a></div>
         )}
         {d.industry && (
-          <div><b>業界</b><a class="chip" href={url(`industries/${slugify(d.industry)}`)}>{d.industry}</a></div>
+          <div><b>業界</b><a class="chip" href={url(`industries/${slugify(d.industry)}`)}>{label('industries', d.industry)}</a></div>
         )}
         {d.cloud.length > 0 && (
           <div><b>クラウド</b>{d.cloud.map((x) => <a class="chip cloud" href={url(`cloud/${slugify(x)}`)}>{x}</a>)}</div>
