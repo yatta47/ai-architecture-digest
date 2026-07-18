@@ -9,6 +9,12 @@
   generate : status='fetched' の記事を `claude -p` に渡して事例MDを作る → src/content/cases/<id>.md、status='generated'
   status   : 台帳サマリ（status別・source別件数）を表示
 
+無人ジョブ向けの分割生成（`claude -p` を使わない経路）:
+  generate-emit  : fetched を claim（generating へ）し、生成プロンプトを JSONL で出力（LLMは呼ばない）
+  generate-ingest: tmux セッション内の Claude が生成した JSON を取り込み → write_case → generated
+  ※ claude-job（tmux・-p非使用）で回すときは generate ではなく emit→(セッション生成)→ingest を使う。
+    -p 経路（generate/run）はローカル手動実行用に残している。
+
 取得方式:
   - rss                : RSS を parse（stdlib）→ 本文は bs4 抽出
   - sitemap / page-diff: ソース別 discovery（catalog ロジックを移植・自己完結）でURL列挙 → 各ページから title/date/text
@@ -21,6 +27,8 @@
 使い方:
   python scripts/collect.py fetch [--source ID] [--max-new-per-source N] [--max-total N] [--max-fetch M] [--dry-run]
   python scripts/collect.py generate [--limit N] [--dry-run]
+  python scripts/collect.py generate-emit [--limit N] [--out FILE]
+  python scripts/collect.py generate-ingest [--input FILE]
   python scripts/collect.py retry [--limit N] [--include-generating]
   python scripts/collect.py status
   python scripts/collect.py run [--source ID] [--max-new-per-source N] [--max-total N] [--generate-limit N]
@@ -638,6 +646,105 @@ def cmd_generate(args):
     log(f"generate done: {done} case(s)")
 
 
+def cmd_generate_emit(args):
+    """fetched を claim（generating へ移す）し、生成プロンプトを JSONL で出力する。
+
+    LLM は呼ばない（`claude -p` 非使用）。claude-job（tmux）内の Claude が各行の prompt を
+    処理し、その結果を generate-ingest に渡す前提。1行 = {"id","source_name","url","prompt"}。
+    claim 済み（generating）だが ingest されなかった記事は retry --include-generating で戻す。
+    """
+    con = db_connect()
+    vocab = load_vocab()
+    # 出力先を先に開いてから claim する。--out のパスが不正でも記事を generating に
+    # 取り残さない（claim は commit 済みで巻き戻せないため、副作用は開けた後だけにする）。
+    out = open(args.out, "w", encoding="utf-8") if args.out else sys.stdout
+    n = 0
+    try:
+        rows = claim_fetched(con, args.limit)
+        for row in rows:
+            rec = {
+                "id": row["id"],
+                "source_name": row["source_name"],
+                "url": row["url"],
+                "prompt": build_prompt(row, vocab),
+            }
+            out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            n += 1
+    finally:
+        if args.out:
+            out.close()
+    log(f"generate-emit: claimed {n} article(s) → {args.out or 'stdout'}")
+
+
+def _ingest_mark_error(con, aid: str, msg: str) -> None:
+    con.execute(
+        "UPDATE articles SET status='error', error=? WHERE id=? AND status='generating'",
+        (msg[:300], aid),
+    )
+    con.commit()
+
+
+def cmd_generate_ingest(args):
+    """generate-emit で claim した記事に対する、セッション生成結果を取り込む。
+
+    input（省略時 stdin）は JSONL。各行:
+      {"id": <article id>, "data": {<事例カードJSON>}}   … 成功。data は dict でも文字列でも可。
+      {"id": <article id>, "error": "<理由>"}            … セッション側で生成できなかった。
+    generating の記事のみ対象（それ以外の id は無視）。write_case → generated、失敗は error。
+    """
+    con = db_connect()
+    src = open(args.input, encoding="utf-8") if args.input else sys.stdin
+    ok = err = skipped = 0
+    try:
+        for line in src:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception as e:
+                log("  ingest: bad JSONL line", type(e).__name__, str(e)[:120]); skipped += 1; continue
+            aid = rec.get("id")
+            if not aid:
+                log("  ingest: line without id, skip"); skipped += 1; continue
+            row = con.execute(
+                "SELECT * FROM articles WHERE id=? AND status='generating'", (aid,)
+            ).fetchone()
+            if row is None:
+                log("  ingest: not in generating, skip", aid); skipped += 1; continue
+            if rec.get("error") or "data" not in rec:
+                msg = str(rec.get("error") or "no data in ingest record")
+                _ingest_mark_error(con, aid, msg)
+                log("  gen-fail", aid, msg[:120]); err += 1; continue
+            try:
+                data = rec["data"]
+                if isinstance(data, str):
+                    data = parse_json(data)
+                if not isinstance(data, dict):
+                    raise ValueError(f"data is {type(data).__name__}, expected object")
+                # 空/退化データ（summary も title も無い）を generated として書き出さない。
+                # ingest は無人公開経路のため、最低限の中身が無ければ error に落とす。
+                if not (str(data.get("summary", "")).strip() or str(data.get("title", "")).strip()):
+                    raise ValueError("empty case data (no summary/title)")
+                path = write_case(row, data)
+            except Exception as e:
+                _ingest_mark_error(con, aid, f"{type(e).__name__}: {e}")
+                log("  gen-fail", aid, type(e).__name__, str(e)[:160]); err += 1; continue
+            con.execute(
+                """UPDATE articles
+                   SET status='generated', case_path=?, generated_at=?, error=NULL
+                   WHERE id=? AND status='generating'""",
+                (str(path.relative_to(ROOT)), now_iso(), aid),
+            )
+            con.commit()
+            log("  wrote", f"cases/{aid}.md", "|", data.get("type"), "|", str(data.get("title", ""))[:45])
+            ok += 1
+    finally:
+        if args.input:
+            src.close()
+    log(f"generate-ingest done: {ok} written, {err} error(s), {skipped} skipped")
+
+
 def cmd_retry(args):
     con = db_connect()
     statuses = ["error"]
@@ -707,6 +814,13 @@ def main():
     pg.add_argument("--limit", type=positive_int, default=3)
     pg.add_argument("--dry-run", action="store_true")
     pg.set_defaults(func=cmd_generate)
+    pe = sub.add_parser("generate-emit")
+    pe.add_argument("--limit", type=positive_int, default=30)
+    pe.add_argument("--out")
+    pe.set_defaults(func=cmd_generate_emit)
+    pi = sub.add_parser("generate-ingest")
+    pi.add_argument("--input")
+    pi.set_defaults(func=cmd_generate_ingest)
     sub.add_parser("status").set_defaults(func=cmd_status)
     pt = sub.add_parser("retry")
     pt.add_argument("--limit", type=positive_int, default=0)

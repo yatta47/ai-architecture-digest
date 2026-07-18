@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -167,6 +168,141 @@ class CollectorTestCase(unittest.TestCase):
             collector.cmd_retry(SimpleNamespace(limit=0, include_generating=True))
         states = dict(con.execute("SELECT id,status FROM articles"))
         self.assertEqual(states, {"error": "fetched", "generating": "fetched"})
+
+
+    def test_generate_emit_claims_fetched_and_writes_prompts(self):
+        con = collector.db_connect()
+        con.executemany(
+            """INSERT INTO articles(id,url,source_id,source_name,status,text,published,fetched_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            [
+                ("case-0", "https://example.com/0", "example", "Example", "fetched",
+                 "body zero", "2026-07-10", "2026-07-10"),
+                ("case-1", "https://example.com/1", "example", "Example", "fetched",
+                 "body one", "2026-07-11", "2026-07-11"),
+            ],
+        )
+        con.commit()
+        con.close()
+
+        out_path = self.root / "prompts.jsonl"
+        with contextlib.redirect_stderr(io.StringIO()):
+            collector.cmd_generate_emit(SimpleNamespace(limit=30, out=str(out_path)))
+
+        lines = [json.loads(l) for l in out_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        self.assertEqual({r["id"] for r in lines}, {"case-0", "case-1"})
+        self.assertTrue(all("prompt" in r and r["prompt"] for r in lines))
+        # プロンプトには記事の source_url が埋まっている
+        by_id = {r["id"]: r for r in lines}
+        self.assertIn("https://example.com/0", by_id["case-0"]["prompt"])
+
+        con = collector.db_connect()
+        states = dict(con.execute("SELECT id,status FROM articles"))
+        self.assertEqual(states, {"case-0": "generating", "case-1": "generating"})
+
+    def _insert_generating(self, con, aid="case-0", url="https://example.com/0"):
+        con.execute(
+            """INSERT INTO articles(id,url,source_id,source_name,tier,title,published,text,status,fetched_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (aid, url, "example", "Example", "tier1", "Orig Title", "2026-07-11",
+             "body", "generating", "2026-07-11"),
+        )
+        con.commit()
+
+    def test_generate_ingest_writes_case_and_marks_generated(self):
+        con = collector.db_connect()
+        self._insert_generating(con)
+        con.close()
+
+        data = {
+            "type": "case", "ai_relevant": True,
+            "title": "テストシステム", "title_original": "Test System",
+            "company": "ACME", "industry": "cross-industry",
+            "cloud": ["AWS"], "patterns": ["RAG"], "components": ["Amazon Bedrock"],
+            "outcome": {"type": "cost-reduction"},
+            "summary": "概要文です。", "design_point": ["設計判断1"], "use_case": ["用途1"],
+        }
+        in_path = self.root / "results.jsonl"
+        in_path.write_text(json.dumps({"id": "case-0", "data": data}) + "\n", encoding="utf-8")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            collector.cmd_generate_ingest(SimpleNamespace(input=str(in_path)))
+
+        con = collector.db_connect()
+        row = con.execute("SELECT status,case_path FROM articles WHERE id='case-0'").fetchone()
+        self.assertEqual(row["status"], "generated")
+        self.assertEqual(row["case_path"], "src/content/cases/case-0.md")
+        md = (self.cases / "case-0.md").read_text(encoding="utf-8")
+        self.assertIn("テストシステム", md)
+        self.assertIn("## 設計のポイント", md)
+
+    def test_generate_ingest_accepts_data_as_json_string(self):
+        con = collector.db_connect()
+        self._insert_generating(con)
+        con.close()
+
+        payload = "```json\n" + json.dumps(
+            {"type": "opinion", "ai_relevant": False, "title": "考察", "summary": "概要"}
+        ) + "\n```"
+        in_path = self.root / "results.jsonl"
+        in_path.write_text(json.dumps({"id": "case-0", "data": payload}) + "\n", encoding="utf-8")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            collector.cmd_generate_ingest(SimpleNamespace(input=str(in_path)))
+
+        con = collector.db_connect()
+        self.assertEqual(
+            con.execute("SELECT status FROM articles WHERE id='case-0'").fetchone()["status"],
+            "generated",
+        )
+
+    def test_generate_ingest_rejects_empty_data(self):
+        con = collector.db_connect()
+        self._insert_generating(con)
+        con.close()
+
+        in_path = self.root / "results.jsonl"
+        in_path.write_text(json.dumps({"id": "case-0", "data": {}}) + "\n", encoding="utf-8")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            collector.cmd_generate_ingest(SimpleNamespace(input=str(in_path)))
+
+        con = collector.db_connect()
+        self.assertEqual(
+            con.execute("SELECT status FROM articles WHERE id='case-0'").fetchone()["status"],
+            "error",
+        )
+        self.assertFalse((self.cases / "case-0.md").exists())
+
+    def test_generate_ingest_marks_error_and_skips_non_generating(self):
+        con = collector.db_connect()
+        self._insert_generating(con, "err-explicit", "https://example.com/e1")
+        self._insert_generating(con, "err-baddata", "https://example.com/e2")
+        con.execute(
+            "INSERT INTO articles(id,url,status) VALUES(?,?,?)",
+            ("already", "https://example.com/a", "generated"),
+        )
+        con.commit()
+        con.close()
+
+        lines = [
+            {"id": "err-explicit", "error": "session could not generate"},
+            {"id": "err-baddata", "data": "not a json object"},
+            {"id": "already", "data": {"type": "case", "summary": "x"}},  # not generating → skip
+            {"id": "missing", "data": {"type": "case", "summary": "x"}},  # unknown id → skip
+        ]
+        in_path = self.root / "results.jsonl"
+        in_path.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            collector.cmd_generate_ingest(SimpleNamespace(input=str(in_path)))
+
+        con = collector.db_connect()
+        states = dict(con.execute("SELECT id,status FROM articles"))
+        self.assertEqual(states["err-explicit"], "error")
+        self.assertEqual(states["err-baddata"], "error")
+        self.assertEqual(states["already"], "generated")  # 変化なし
+        self.assertNotIn("missing", states)  # 作られない
 
 
 if __name__ == "__main__":
