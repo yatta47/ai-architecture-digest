@@ -31,7 +31,14 @@ const isExplore = /\/explore\/?$/.test(path);
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {/* GA4 gtag は公開直前にここへ入れる: config('G-XXXXXXXXXX') */}
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XTD8QLYTM"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-7XTD8QLYTM');
+    </script>
     <style is:global>
       :root {
         --bg: #ffffff;
