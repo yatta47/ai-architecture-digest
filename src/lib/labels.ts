@@ -16,6 +16,16 @@ const MAPS: Record<string, Record<string, string>> = {
     'cross-industry': '業界横断',
     other: 'その他',
   },
+  // vocab/outcomes.yml
+  outcomes: {
+    productivity: '生産性',
+    cost: 'コスト',
+    quality: '品質',
+    revenue: '収益',
+    'risk-compliance': 'リスク・コンプライアンス',
+    speed: '速度',
+    reliability: '信頼性',
+  },
 };
 
 /** facet 種別 kind の値 value を日本語表示ラベルに。無ければ生値を返す。 */

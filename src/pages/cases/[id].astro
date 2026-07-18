@@ -52,7 +52,7 @@ const similar = similarCases(entry, all);
           <div><b>データ</b>{d.data_sources.map((x) => <a class="chip" href={url(`data-sources/${slugify(x)}`)}>{x}</a>)}</div>
         )}
         {d.outcome && (
-          <div><b>成果</b><a class="chip" href={url(`outcomes/${slugify(d.outcome.type)}`)}>{d.outcome.type}</a></div>
+          <div><b>成果</b><a class="chip" href={url(`outcomes/${slugify(d.outcome.type)}`)}>{label('outcomes', d.outcome.type)}</a></div>
         )}
       </div>
     </div>
