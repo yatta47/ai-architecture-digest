@@ -17,13 +17,6 @@ components:
 - Azure Document Intelligence
 - Google Cloud Document AI
 - HuggingFace
-data_sources:
-- エンタープライズ文書
-- 表
-- グラフ
-- 財務報告
-- 保険申請書(SERFF)
-- 政府文書
 outcome:
   type: quality
 source_id: llamaindex-blog

@@ -20,10 +20,6 @@ components:
 - GitHub Actions
 - Docker
 - Go
-data_sources:
-- Dockerイメージ
-- イメージタグ
-- CloudFormationテンプレート
 outcome:
   type: productivity
 source_id: aws-architecture-center

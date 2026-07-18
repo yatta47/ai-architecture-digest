@@ -19,10 +19,6 @@ components:
 - Azure Pipelines
 - GitHub Actions
 - Azure Storage
-data_sources:
-- アプリケーション状態
-- ファイルシステムコンテンツ
-- ヘルスプローブ
 outcome:
   type: reliability
 source_id: azure-architecture-center

@@ -14,9 +14,6 @@ components:
 - Claude Code
 - Claude Fable 5
 - Claude Opus 4.8
-data_sources:
-- ソースコード
-- テストスイート
 outcome:
   type: speed
 source_id: claude-blog

@@ -23,11 +23,6 @@ components:
 - Vector Search
 - Unity AI Gateway
 - MLflow
-data_sources:
-- トラッキングデータ
-- 試合イベント
-- 選手プロフィール
-- ラインアップ
 outcome:
   type: speed
 source_id: databricks-blog

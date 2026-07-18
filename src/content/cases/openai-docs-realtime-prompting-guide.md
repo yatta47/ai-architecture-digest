@@ -13,10 +13,6 @@ components:
 - gpt-realtime-2
 - gpt-realtime-1.5
 - OpenAI Realtime API
-data_sources:
-- 音声入力
-- ツール呼び出し
-- 長時間セッションの状態
 outcome:
   type: quality
 source_id: openai-docs

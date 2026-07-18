@@ -17,12 +17,6 @@ components:
 - Delta Sharing (Open Sharing)
 - Stripe
 - NetSuite
-data_sources:
-- 利用量データ
-- コンピュートコスト
-- 課金・サブスク/従量課金データ
-- 決済トランザクション
-- 収益・粗利データ
 outcome:
   type: revenue
 source_id: databricks-blog

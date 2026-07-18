@@ -18,10 +18,6 @@ components:
 - Amazon SQS
 - Amazon S3
 - AWS IAM
-data_sources:
-- ソースコード
-- プロファイリングデータ
-- セキュリティ/欠陥の指摘
 outcome:
   type: quality
 source_id: aws-architecture-center

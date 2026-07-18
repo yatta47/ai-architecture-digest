@@ -19,11 +19,6 @@ components:
 - Microsoft Defender for Identity
 - Microsoft Defender for Cloud Apps
 - Microsoft Sentinel
-data_sources:
-- 認証リクエスト
-- 脅威シグナル
-- IDリスク情報
-- IAMロール/ユーザー
 outcome:
   type: risk-compliance
 source_id: azure-architecture-center

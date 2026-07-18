@@ -17,7 +17,6 @@ const cases = defineCollection({
     cloud: z.array(z.string()).default([]), // vocab: cloud
     patterns: z.array(z.string()).default([]), // vocab: patterns
     components: z.array(z.string()).default([]), // vocab: components/products
-    data_sources: z.array(z.string()).default([]), // free-form
     outcome: z.object({ type: z.string() }).optional(), // vocab: outcomes
     source_id: z.string().optional(),
     source_name: z.string().optional(),

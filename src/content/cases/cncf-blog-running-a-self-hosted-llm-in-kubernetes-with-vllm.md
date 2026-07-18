@@ -17,9 +17,6 @@ components:
 - LINSTOR CSI driver
 - Hugging Face
 - Llama-3.2-1B-Instruct
-data_sources:
-- モデルの重み
-- 推論リクエスト
 outcome:
   type: risk-compliance
 source_id: cncf-blog

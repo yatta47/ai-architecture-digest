@@ -21,10 +21,6 @@ components:
 - Amazon API Gateway
 - Amazon S3
 - Amazon EC2 Spot
-data_sources:
-- 組織間共有データ
-- 履歴データ
-- バックアップ
 outcome:
   type: cost
 source_id: aws-architecture-blog

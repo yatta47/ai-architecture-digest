@@ -13,7 +13,6 @@ components:
 - Azure Backup
 - Availability Zones
 - 地域冗長ストレージ (LRS/ZRS/GRS)
-data_sources: []
 outcome:
   type: reliability
 source_id: azure-blog

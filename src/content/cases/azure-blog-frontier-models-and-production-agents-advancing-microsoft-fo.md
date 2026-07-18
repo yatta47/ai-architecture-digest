@@ -21,8 +21,6 @@ components:
 - Microsoft Agent Framework
 - GitHub Copilot SDK
 - Foundry Toolkit for VS Code
-data_sources:
-- エンタープライズデータ
 outcome:
   type: productivity
 source_id: azure-blog

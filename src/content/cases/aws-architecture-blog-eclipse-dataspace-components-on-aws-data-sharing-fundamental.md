@@ -17,10 +17,6 @@ components:
 - AWS Secrets Manager
 - Amazon DynamoDB
 - Gradle
-data_sources:
-- 共有データセット
-- フェデレーテッドカタログ
-- 検証可能クレデンシャル
 outcome:
   type: risk-compliance
 source_id: aws-architecture-blog

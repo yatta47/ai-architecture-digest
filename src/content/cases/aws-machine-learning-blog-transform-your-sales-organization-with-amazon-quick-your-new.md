@@ -24,15 +24,6 @@ components:
 - HubSpot
 - ServiceNow
 - Slack
-data_sources:
-- CRMデータ
-- メール
-- Web解析
-- サポートチケット
-- Slackメッセージ
-- 社内ドキュメント
-- アカウント履歴
-- 通話トランスクリプト
 outcome:
   type: productivity
 source_id: aws-machine-learning-blog

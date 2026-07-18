@@ -11,7 +11,6 @@ const groups = [
   { label: '技術スタック', key: 'components', route: 'components' },
   { label: '企業', key: 'companies', route: 'companies' },
   { label: '成果', key: 'outcomes', route: 'outcomes' },
-  { label: 'データ種別', key: 'data-sources', route: 'data-sources' },
 ]
   .map((g) => ({ ...g, items: facetSummary(entries, accessors[g.key]) }))
   .filter((g) => g.items.length > 0);
@@ -19,7 +18,7 @@ const groups = [
 
 <Base title="軸で探す">
   <h1 class="page">軸で探す</h1>
-  <p class="count">クラウド・パターン・業界・技術スタック・企業・成果・データ種別で引く。全{entries.length}件。</p>
+  <p class="count">クラウド・パターン・業界・技術スタック・企業・成果で引く。全{entries.length}件。</p>
   <div class="explore-grid">
     {groups.map((g) => (
       <div class="exp-group">

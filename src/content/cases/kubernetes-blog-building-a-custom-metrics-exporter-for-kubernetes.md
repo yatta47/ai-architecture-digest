@@ -7,7 +7,6 @@ industry: cross-industry
 cloud: []
 patterns: []
 components: []
-data_sources: []
 outcome:
   type: reliability
 source_id: kubernetes-blog

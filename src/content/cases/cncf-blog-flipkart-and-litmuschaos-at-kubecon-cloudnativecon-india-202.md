@@ -8,7 +8,6 @@ industry: retail
 cloud: []
 patterns: []
 components: []
-data_sources: []
 outcome:
   type: reliability
 source_id: cncf-blog

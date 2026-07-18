@@ -12,7 +12,6 @@ patterns:
 components:
 - Claude Code
 - Claude Fable 5
-data_sources: []
 outcome:
   type: quality
 source_id: claude-blog
