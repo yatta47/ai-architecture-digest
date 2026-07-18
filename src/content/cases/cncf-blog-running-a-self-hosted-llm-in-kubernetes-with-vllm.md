@@ -34,7 +34,9 @@ published_at: '2026-07-16'
 
 ## 設計のポイント
 
-モデル重みのキャッシュパス(/root/.cache/huggingface)を2レプリカのLINSTOR永続ストレージで裏打ちし、ダウンロードを初回のみに抑えてPod再起動やノード障害を跨いで重みを保持する。vLLMがOpenAI互換RESTを公開するため、既存のOpenAI/LangChain/LlamaIndexコードをURL変更だけで切り替え可能で、機微・大量処理は自前、それ以外はマネージドAPIというハイブリッド構成が成立する。CPU専用でも--gpu-memory-utilizationを0.80に設定しないと既定92%で起動時にメモリ不足になる点も再利用可能な勘所。
+- モデル重みのキャッシュパス(/root/.cache/huggingface)を2レプリカのLINSTOR永続ストレージで裏打ちし、ダウンロードを初回のみに抑えてPod再起動・ノード障害を跨いで重みを保持する
+- vLLMがOpenAI互換RESTを公開するため、既存のOpenAI/LangChain/LlamaIndexコードをURL変更だけで切り替えでき、機微・大量処理は自前／それ以外はマネージドAPIというハイブリッド構成が成立する
+- CPU専用では--gpu-memory-utilizationを0.80に設定する（既定92%のままだと起動時にメモリ不足になる）
 
 ## 使いどころ
 

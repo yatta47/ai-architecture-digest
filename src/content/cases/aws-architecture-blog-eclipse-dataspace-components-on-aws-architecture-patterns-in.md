@@ -47,7 +47,9 @@ IDSA標準に準拠したEclipse Dataspace Components（EDC）コネクタをAWS
 
 ## 設計のポイント
 
-1コネクタ=1隔離セルを基本単位とし、VPCプライベートサブネット・セキュリティグループ分割・IAM最小権限・保存/転送時の暗号化を独立した層として重ねる多層防御（defense in depth）を採用する。EDCのAPIは内部専用のNetwork Load BalancerをAPI Gatewayで前段化し、SigV4とIAMで保護して意図しない公開露出を防ぐ。インフラはCDKで宣言的にコード化し、CDK Nagで自動検証してデプロイ前に設定ミスとセキュリティ問題を検出（shift-left）する。
+- 1コネクタ=1隔離セルを基本単位に、ネットワーク分離・SG分割・IAM最小権限・暗号化を独立した層として重ねる多層防御（defense in depth）を採る
+- EDCの内部APIは内部専用NLBをAPI Gatewayで前段化し、SigV4とIAMで保護して意図しない公開露出を防ぐ
+- インフラはCDKで宣言的にコード化し、CDK Nagでデプロイ前に設定ミス・セキュリティ問題を自動検出する（shift-left）
 
 ## 使いどころ
 
