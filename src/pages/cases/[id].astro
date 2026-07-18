@@ -19,6 +19,7 @@ const similar = similarCases(entry, all);
   <article class="detail">
     <div class="meta">
       <span class={`badge type-${d.type}`}>{d.type}</span>
+      {d.ai_relevant === false && <span class="badge coverage">概要のみ</span>}
       {d.source_name && <span>{d.source_name}</span>}
       <span>{d.published_at}</span>
     </div>

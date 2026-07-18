@@ -88,6 +88,7 @@ const isExplore = /\/explore\/?$/.test(path);
       .row-title { margin: 0 0 0.25rem; font-size: 1.05rem; font-weight: 700; color: #16213e; line-height: 1.42; }
       .row-meta { color: var(--muted); font-size: 0.76rem; margin-bottom: 0.25rem; }
       .row-meta .new { color: #d33; font-weight: 700; margin-left: 0.3rem; }
+      .row-meta .cov { color: #6b7280; font-weight: 700; margin-left: 0.3rem; }
       .row-excerpt { color: #555; font-size: 0.83rem; margin: 0.15rem 0 0.35rem; }
       @media (max-width: 620px) { .thumb { flex-basis: 90px; height: 66px; } .row-title { font-size: 0.98rem; } }
 
@@ -102,6 +103,7 @@ const isExplore = /\/explore\/?$/.test(path);
       .type-guidance { background: #8a6d1f; }
       .type-opinion { background: #9c3f57; }
       .type-announcement { background: #3f8a63; }
+      .badge.coverage { background: #6b7280; } /* 非AI=網羅カバレッジの軽量カード */
 
       .type-filter { display: flex; gap: 0.35rem; margin: 0.2rem 0 0.4rem; flex-wrap: wrap; }
       .tf { background: var(--chip-bg); color: var(--chip-text); border: 1px solid var(--sep); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.76rem; cursor: pointer; }
