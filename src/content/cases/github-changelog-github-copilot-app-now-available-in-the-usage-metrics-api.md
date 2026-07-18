@@ -30,7 +30,8 @@ GitHub CopilotのUsage Metrics APIが、エンタープライズ／組織の1日
 
 ## 設計のポイント
 
-アプリ固有の指標を汎用のfeature/model/language集計やLOC指標に混ぜず、totals_by_copilot_appという独立セクションに分離した点が再利用しやすい設計判断。さらに活動が無い場合は両フィールドをnullで返すことで、既存の連携インテグレーションを壊さず後方互換を保っている。
+- アプリ固有の指標を汎用の集計（feature/model/language/LOC）に混ぜず、`totals_by_copilot_app` として独立セクションに分離する
+- 活動が無い場合は両フィールドを null で返し、既存の連携インテグレーションを壊さず後方互換を保つ
 
 ## 使いどころ
 

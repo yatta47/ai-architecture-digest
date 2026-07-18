@@ -35,7 +35,10 @@ Kubernetesは今やAI/MLワークロードの標準基盤となり、Kubeflowは
 
 ## 設計のポイント
 
-プラグインはKubernetes APIサーバから直接リソースを読み取り、Kubeflow Pipelinesのバックエンドや中間MLサービスに依存しないため、それらが停止中でも保存済みの状態を確認できる。クラスタにインストール済みのAPIグループ（Notebooks/Pipelines/Katib/Training/Spark）を自動検出して該当セクションだけを表示するモジュラー設計とし、ownerReferencesを辿ってリソース間の関係をグラフ表示する。これはCRD中心のあらゆるプラットフォームに応用できる『運用者が既に使う場所でクラスタの真実を見せる』パターンとして提示されている。
+- Kubernetes APIサーバから直接リソースを読み取り、Kubeflow Pipelinesのバックエンドや中間MLサービスに依存させない。それらの停止中でも保存済みの状態を確認できる
+- インストール済みのAPIグループ（Notebooks/Pipelines/Katib/Training/Spark）を自動検出し、該当セクションだけを表示するモジュラー設計にする
+- ownerReferencesを辿ってリソース間の関係をグラフ表示する
+- CRD中心のあらゆるプラットフォームに応用できる『運用者が既に使う場所でクラスタの真実を見せる』パターンとして提示する
 
 ## 使いどころ
 
