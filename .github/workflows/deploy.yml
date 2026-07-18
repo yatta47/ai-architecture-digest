@@ -1,0 +1,36 @@
+name: Deploy to GitHub Pages
+
+# main への push でビルド→Pages公開。生成物(src/content/cases/*.md)はローカル生成済み＝CIは鍵不要のビルドのみ。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GITHUB_TOKEN に Pages デプロイ権限を最小付与
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時デプロイを直列化（進行中の公開を止めない）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # withastro/action が npm 検出→install→astro build→Pages artifact アップロードまで実施
+      - uses: withastro/action@v6
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

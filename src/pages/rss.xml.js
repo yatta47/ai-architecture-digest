@@ -1,6 +1,6 @@
 import rss from '@astrojs/rss';
 import { getCollection } from 'astro:content';
-import { plainExcerpt } from '../lib/facets';
+import { plainExcerpt, url } from '../lib/facets';
 
 export async function GET(context) {
   const cases = await getCollection('cases');
@@ -8,12 +8,15 @@ export async function GET(context) {
   return rss({
     title: 'AI Architecture 事例カタログ',
     description: '追跡ソースの新着を切り口で引ける事例カタログ',
-    site: context.site,
+    // channel の <link> も base 付きサイトルートにする（context.site は base 未加算のため）。
+    // item link は先頭 '/' の絶対パス＝オリジン基準で解決されるので二重 prefix にはならない。
+    site: new URL(url(''), context.site),
     items: cases.map((e) => {
       const item = {
         title: e.data.title,
         description: plainExcerpt(e.body, 200),
-        link: `/cases/${e.id}/`,
+        // base 対応（project pages のサブパス /ai-architecture-digest/ を前置。site+link で絶対URL化される）
+        link: url(`cases/${e.id}/`),
       };
       // published_at が欠損/不正な生成エントリでも RSS を壊さない
       const d = e.data.published_at ? new Date(e.data.published_at) : null;
