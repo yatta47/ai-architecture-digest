@@ -1,0 +1,187 @@
+# 技術スタック語彙＝具体サービス名（catalog products.yml 由来）。
+components:
+- Amazon API Gateway
+- Amazon Athena
+- Amazon Bedrock
+- Amazon Bedrock AgentCore
+- Amazon Bedrock Data Automation
+- Amazon Bedrock Knowledge Bases
+- Amazon CloudWatch
+- Amazon Cognito
+- Amazon Connect
+- Amazon DataZone
+- Amazon EC2
+- Amazon ECS
+- Amazon EKS
+- Amazon EMR Serverless
+- Amazon Lex
+- Amazon Nova 2 Lite
+- Amazon Polly
+- Amazon QuickSight
+- Amazon RDS
+- Amazon Route 53
+- Amazon S3
+- Amazon SageMaker AI
+- Amazon SageMaker Unified Studio
+- Amazon Textract
+- Amazon Transcribe
+- Amazon Verified Permissions
+- Amazon VPC
+- Amazon WorkSpaces Secure Browser
+- AWS CloudFormation
+- AWS CloudTrail
+- AWS Config
+- AWS Fault Injection Service
+- AWS Glue
+- AWS HealthLake
+- AWS IAM
+- AWS IAM Identity Center
+- AWS KMS
+- AWS Lambda
+- AWS Resilience Hub
+- AWS Secrets Manager
+- AWS Step Functions
+- AWS Systems Manager
+- AWS WAF
+- Cloud Interconnect
+- Cloud Load Balancing
+- Cloud Router
+- Cloud Storage
+- Cloud VPN
+- Google Cloud Armor
+- Model Armor
+- Network Connectivity Center
+- Private Google Access
+- Private Service Connect
+- Shared VPC
+- VPC Service Controls
+- Azure
+- Azure AI Content Safety
+- Azure Copilot
+- Azure Copilot Observability Agent
+- Azure Files
+- Azure Resource Manager MCP Server
+- Copilot in Excel
+- Foundry Agent Service
+- GitHub
+- GitHub Copilot
+- GitHub Actions
+- Microsoft 365
+- Microsoft Agent 365
+- Microsoft Agent Platform
+- Microsoft Copilot Studio
+- Microsoft Defender for Cloud
+- Microsoft Defender for Cloud Apps
+- Microsoft Discovery
+- Microsoft Discovery app
+- Microsoft Entra Agent ID
+- Microsoft Foundry
+- Microsoft IQ
+- Microsoft Purview
+- Microsoft Sentinel
+- SkillOpt
+- GPT-5.2
+- GPT-5.3-Codex
+- GPT-5.5
+- GPT Realtime 1.5
+- GPT Realtime 2
+- GPT Realtime Translate
+- GPT Realtime Whisper
+- OpenAI Codex
+- OpenAI Docs MCP
+- Responses API
+- Sora 2
+- ChatGPT Dreaming
+- Claude Agent SDK
+- Claude Code
+- Claude Dreams
+- Claude Fable 5
+- Claude Opus 4.8
+- Claude Sonnet 4
+- Claude Sonnet 4.6
+- AgentEvals
+- OpenEvals
+- dcode
+- Deep Agents
+- LangChain Benchmarks
+- LangGraph
+- LangSmith
+- LangSmith Sandboxes
+- OpenWiki
+- SmithDB
+- Harbor
+- Databricks
+- Lakebase
+- Neon
+- Genie Code
+- Unity Catalog
+- Genie
+- Lakehouse
+- Agent Bricks
+- Many Model Forecasting (MMF)
+- MMF Agent
+- Databricks Lakeflow
+- Databricks Serverless GPU Compute
+- Databricks Foundation Model API
+- gpu-monitor
+- Snowflake
+- Agentforce
+- Unified Planner
+- Analyze Build Tools
+- Managed Pipelines
+- MuleSoft
+- Golden Gate
+- Prizm
+- Agent Fabric
+- AMD SEV-SNP
+- Intel TDX
+- NVIDIA HGX B300
+- NeMo Data Designer
+- NeMo Gym
+- NeMo RL
+- Nemotron 3 Super
+- Nemotron Nano 9B v2
+- NVIDIA Confidential Computing
+- NCCL
+- NVIDIA DCGM
+- NVIDIA DRA Driver for GPU
+- NVIDIA GPU Operator
+- NVIDIA Remote Attestation Service
+- NVLink
+- NVIDIA RTX PRO 6000
+- FlashInfer
+- SGLang
+- Genpage
+- Vera
+- VOID
+- Gen Omnimatte
+- CogVideoX-Fun v1.5 5B (Inpainting)
+- AA Briefcase
+- Arize AX
+- Arize Phoenix
+- OpenInference
+- PXI (Phoenix Intelligence)
+- TrueFoundry AI Gateway
+- Vercel AI SDK
+- Pydantic AI
+- Mintlify
+- DeepSeek V4 Pro
+- GLM-5.2
+- Mistral 7B
+- SAM3
+- CodeRabbit
+- Kubernetes
+- MLflow
+- PostgreSQL
+- Argo CD
+- Dragonfly
+- Ollama
+- Splunk
+- WebAssembly
+- OpenTelemetry
+- QuickJS
+- Kepler
+- Lingua
+- Apache Iceberg
+- Salesforce Data 360
+- Zero Copy

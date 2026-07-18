@@ -1,0 +1,185 @@
+# 追跡ソース台帳（ai-architecture-catalog の content/sources/sources.yml から active 分を写経）
+# collect.py はこの watch-list を読んで新着を取得する。method=rss を優先実装。
+sources:
+- id: aws-machine-learning-blog
+  name: AWS Machine Learning Blog
+  tier: tier1
+  priority: high
+  method: rss
+  url: https://aws.amazon.com/blogs/machine-learning/feed/
+  vendors:
+  - aws
+- id: aws-architecture-center
+  name: AWS Architecture Center
+  tier: tier1
+  priority: medium
+  method: internal-api
+  url: https://aws.amazon.com/architecture/
+  vendors:
+  - aws
+- id: aws-architecture-blog
+  name: AWS Architecture Blog
+  tier: tier1
+  priority: high
+  method: rss
+  url: https://aws.amazon.com/blogs/architecture/feed/
+  vendors:
+  - aws
+- id: google-cloud-architecture-center
+  name: Google Cloud Architecture Center
+  tier: tier1
+  priority: high
+  method: sitemap
+  url: https://docs.cloud.google.com/architecture
+  vendors:
+  - gcp
+- id: azure-architecture-center
+  name: Azure Architecture Center
+  tier: tier1
+  priority: high
+  method: sitemap
+  url: https://learn.microsoft.com/en-us/azure/architecture/
+  vendors:
+  - azure
+- id: azure-blog
+  name: Azure Blog
+  tier: tier1
+  priority: high
+  method: rss
+  url: https://azure.microsoft.com/en-us/blog/feed/
+  vendors:
+  - microsoft
+  - azure
+- id: microsoft-source
+  name: Microsoft Source
+  tier: tier3
+  priority: low
+  method: rss
+  url: https://news.microsoft.com/source/feed/
+  vendors:
+  - microsoft
+  - azure
+- id: openai-docs
+  name: OpenAI Docs
+  tier: tier1
+  priority: high
+  method: rss
+  url: https://developers.openai.com/rss.xml
+  vendors:
+  - openai
+- id: anthropic-docs
+  name: Anthropic Docs
+  tier: tier1
+  priority: high
+  method: sitemap
+  url: https://platform.claude.com/docs/en/home
+  vendors:
+  - anthropic
+- id: claude-blog
+  name: Claude Blog
+  tier: tier1
+  priority: high
+  method: sitemap
+  url: https://claude.com/blog
+  vendors:
+  - anthropic
+- id: nvidia-technical-blog
+  name: NVIDIA Technical Blog
+  tier: tier1
+  priority: high
+  method: rss
+  url: https://developer.nvidia.com/blog/feed/
+  vendors:
+  - nvidia
+- id: cncf-blog
+  name: CNCF Blog
+  tier: tier2
+  priority: high
+  method: rss
+  url: https://www.cncf.io/blog/feed/
+  vendors: []
+- id: kubernetes-blog
+  name: Kubernetes Blog
+  tier: tier2
+  priority: high
+  method: rss
+  url: https://kubernetes.io/feed.xml
+  vendors: []
+- id: nist-ai-risk-management-framework
+  name: NIST AI Risk Management Framework
+  tier: tier1
+  priority: high
+  method: manual
+  url: https://www.nist.gov/itl/ai-risk-management-framework
+  vendors: []
+- id: owasp-genai-security-project
+  name: OWASP GenAI Security Project
+  tier: tier1
+  priority: high
+  method: sitemap
+  url: https://genai.owasp.org/resources/
+  vendors: []
+- id: owasp-llm-top-10
+  name: OWASP Top 10 for Large Language Model Applications
+  tier: tier1
+  priority: high
+  method: manual
+  url: https://genai.owasp.org/llm-top-10/
+  vendors: []
+- id: github-changelog
+  name: GitHub Changelog
+  tier: tier2
+  priority: medium
+  method: rss
+  url: https://github.blog/changelog/feed/
+  vendors:
+  - github
+- id: langchain-blog
+  name: LangChain Blog
+  tier: tier2
+  priority: high
+  method: rss
+  url: https://www.langchain.com/blog/rss.xml
+  vendors: []
+- id: llamaindex-blog
+  name: LlamaIndex Blog
+  tier: tier2
+  priority: medium
+  method: page-diff
+  url: https://www.llamaindex.ai/blog
+  vendors: []
+- id: databricks-blog
+  name: Databricks Blog
+  tier: tier2
+  priority: medium
+  method: rss
+  url: https://www.databricks.com/feed
+  vendors: []
+- id: langsmith-docs
+  name: LangSmith Docs
+  tier: tier2.5
+  priority: high
+  method: sitemap
+  url: https://docs.langchain.com/langsmith/observability
+  vendors: []
+- id: arize-blog
+  name: Arize Blog
+  tier: tier2.5
+  priority: medium
+  method: rss
+  url: https://arize.com/feed/
+  vendors: []
+- id: salesforce-engineering-blog
+  name: Salesforce Engineering Blog
+  tier: tier3
+  priority: low
+  method: rss
+  url: https://engineering.salesforce.com/feed/
+  vendors: []
+- id: netflix-techblog
+  name: Netflix TechBlog
+  tier: tier4
+  priority: low
+  method: manual
+  url: https://netflixtechblog.com/feed
+  vendors: []
