@@ -19,3 +19,36 @@ npm run dev        # 開発サーバ
 ```
 
 BigQueryの確認・学習用SQLは [`docs/ga4-bigquery-guide.md`](docs/ga4-bigquery-guide.md) を参照。
+
+## 記事の収集と生成
+
+収集と生成はSQLite台帳を介した独立ジョブとして実行する。収集は新着を広く蓄積し、LLM生成は少数ずつ処理する。
+
+```bash
+# 全自動ソースから、1ソース最大50件・全体最大500件を取得
+python scripts/collect.py fetch
+
+# 待機中の記事を3件だけ生成
+python scripts/collect.py generate --limit 3
+
+# 台帳の待機・処理中・生成済み・エラー件数を確認
+python scripts/collect.py status
+
+# エラー記事を待機キューへ戻す
+python scripts/collect.py retry
+```
+
+一括実行する場合も、取得上限と生成上限は別々に指定する。
+
+```bash
+python scripts/collect.py run \
+  --max-new-per-source 50 \
+  --max-total 500 \
+  --generate-limit 3
+```
+
+異常終了で`generating`に残った記事は、他の生成プロセスが動いていないことを確認してから戻す。
+
+```bash
+python scripts/collect.py retry --include-generating
+```

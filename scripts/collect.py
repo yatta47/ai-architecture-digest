@@ -2,7 +2,7 @@
 """ai-architecture-digest collector.
 
 状態は SQLite（scripts/.cache/collect.db）の articles 台帳で一元管理する。
-  status: fetched（取得済み・未生成） / generated（事例MD生成済み） / error
+  status: fetched（取得済み・未生成） / generating（生成処理中） / generated（生成済み） / error
 
 2 段構え（ローカル実行前提）:
   fetch    : sources.yml の各ソースから新着を取得 → articles に status='fetched' で登録（決定的・LLM不要）
@@ -19,10 +19,11 @@
   - 冪等: URL が台帳 or 既存 case md にあればスキップ。
   - 語彙は vocab/*.yml を prompt に渡して寄せる（無ければ新語可）。
 使い方:
-  python scripts/collect.py fetch [--source ID] [--limit N] [--max-fetch M] [--dry-run]
+  python scripts/collect.py fetch [--source ID] [--max-new-per-source N] [--max-total N] [--max-fetch M] [--dry-run]
   python scripts/collect.py generate [--limit N] [--dry-run]
+  python scripts/collect.py retry [--limit N] [--include-generating]
   python scripts/collect.py status
-  python scripts/collect.py run [--source ID] [--limit N]
+  python scripts/collect.py run [--source ID] [--max-new-per-source N] [--max-total N] [--generate-limit N]
 """
 from __future__ import annotations
 
@@ -99,26 +100,53 @@ def db_connect() -> sqlite3.Connection:
             source_id TEXT, source_name TEXT, tier TEXT,
             title TEXT, published TEXT, text TEXT, vendors TEXT,
             status TEXT NOT NULL DEFAULT 'fetched',
-            case_path TEXT, fetched_at TEXT, generated_at TEXT, error TEXT)"""
+            case_path TEXT, fetched_at TEXT, generated_at TEXT, error TEXT,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            last_attempt_at TEXT)"""
     )
+    columns = {r[1] for r in con.execute("PRAGMA table_info(articles)")}
+    if "retry_count" not in columns:
+        con.execute("ALTER TABLE articles ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0")
+    if "last_attempt_at" not in columns:
+        con.execute("ALTER TABLE articles ADD COLUMN last_attempt_at TEXT")
     con.execute("CREATE INDEX IF NOT EXISTS idx_status ON articles(status)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_source ON articles(source_id)")
-    # 既存の committed な case md を台帳へ取り込む（DBを消しても重複生成しないため）
-    known = {r[0] for r in con.execute("SELECT url FROM articles")}
+    sync_cases_to_db(con)
+    con.commit()
+    return con
+
+
+def sync_cases_to_db(con: sqlite3.Connection) -> int:
+    """既存Markdownを正として台帳のgenerated状態を補完・修復する。"""
+    repaired = 0
     for p in CASES_DIR.glob("*.md"):
         txt = p.read_text(encoding="utf-8")
         m = re.search(r"^source_url:\s*(\S+)", txt, re.M)
         if not m:
             continue
         url = m.group(1).strip()
-        if url in known:
+        case_path = str(p.relative_to(ROOT))
+        row = con.execute("SELECT status,case_path FROM articles WHERE url=?", (url,)).fetchone()
+        if row:
+            if row["status"] != "generated" or row["case_path"] != case_path:
+                con.execute(
+                    """UPDATE articles
+                       SET status='generated', case_path=?, generated_at=COALESCE(generated_at,?), error=NULL
+                       WHERE url=?""",
+                    (case_path, now_iso(), url),
+                )
+                repaired += 1
             continue
         con.execute(
-            "INSERT OR IGNORE INTO articles(id,url,source_id,status,case_path,generated_at) VALUES(?,?,?,?,?,?)",
-            (p.stem, url, _fm_field(txt, "source_id"), "generated", str(p.relative_to(ROOT)), now_iso()),
+            """INSERT OR IGNORE INTO articles(
+                   id,url,source_id,status,case_path,generated_at
+               ) VALUES(?,?,?,?,?,?)""",
+            (p.stem, url, _fm_field(txt, "source_id"), "generated", case_path, now_iso()),
         )
-    con.commit()
-    return con
+        repaired += 1
+    if repaired:
+        log(f"ledger sync: {repaired} article(s) marked generated from Markdown")
+    return repaired
 
 
 def _fm_field(md: str, key: str) -> str:
@@ -147,6 +175,30 @@ def db_insert_fetched(con, s, title, url, date, text) -> bool:
     con.commit()
     log("  +", aid)
     return True
+
+
+def claim_fetched(con: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
+    """生成対象を排他的にclaimし、別プロセスから見えないgeneratingへ移す。"""
+    con.execute("BEGIN IMMEDIATE")
+    sql = """SELECT * FROM articles
+             WHERE status='fetched' AND text IS NOT NULL AND text!=''
+             ORDER BY published DESC, fetched_at ASC"""
+    params: tuple = ()
+    if limit:
+        sql += " LIMIT ?"
+        params = (limit,)
+    rows = con.execute(sql, params).fetchall()
+    attempted_at = now_iso()
+    for row in rows:
+        con.execute(
+            """UPDATE articles
+               SET status='generating', retry_count=retry_count+1,
+                   last_attempt_at=?, error=NULL
+               WHERE id=? AND status='fetched'""",
+            (attempted_at, row["id"]),
+        )
+    con.commit()
+    return rows
 
 
 # ================= RSS / Atom =================
@@ -346,18 +398,21 @@ DISCOVERERS = {
 
 
 # ================= fetch =================
-def _fetch_rss(con, s, args) -> int:
+def _fetch_rss(con, s, args, remaining: int) -> int:
     try:
         feed = parse_feed(fetch_bytes(s["url"]))
     except Exception as e:
         log("skip", s["id"], type(e).__name__, e); return 0
     feed.sort(key=lambda x: x["date"], reverse=True)
     added = 0
-    for it in feed[: args.limit]:
+    limit = min(args.max_new_per_source, remaining)
+    for it in feed:
+        if added >= limit:
+            break
         if not it["link"] or not it["title"] or is_non_article(it["link"]) or db_has_url(con, it["link"]):
             continue
         if args.dry_run:
-            log("  would add", it["title"][:60]); continue
+            log("  would add", it["title"][:60]); added += 1; continue
         try:
             text = extract_text(it["link"])
         except Exception as e:
@@ -367,12 +422,13 @@ def _fetch_rss(con, s, args) -> int:
     return added
 
 
-def _fetch_nonrss(con, s, args) -> int:
+def _fetch_nonrss(con, s, args, remaining: int) -> int:
     try:
         items = DISCOVERERS[s["id"]]()
     except Exception as e:
         log("skip", s["id"], type(e).__name__, e); return 0
-    fresh = [it for it in items if not db_has_url(con, it["url"]) and not is_non_article(it["url"])][: (args.max_fetch or 30)]
+    fetch_limit = min(args.max_fetch, args.max_new_per_source, remaining)
+    fresh = [it for it in items if not db_has_url(con, it["url"]) and not is_non_article(it["url"])][:fetch_limit]
     log(f"  {s['id']}: {len(items)} urls found, fetching {len(fresh)} for content")
     got = []
     for it in fresh:
@@ -386,9 +442,9 @@ def _fetch_nonrss(con, s, args) -> int:
             got.append((title, it["url"], date, text))
     got.sort(key=lambda x: x[2] or "", reverse=True)
     added = 0
-    for title, u, date, text in got[: args.limit]:
+    for title, u, date, text in got[: min(args.max_new_per_source, remaining)]:
         if args.dry_run:
-            log("  would add", title[:55], date); continue
+            log("  would add", title[:55], date); added += 1; continue
         if db_insert_fetched(con, s, title, u, date, text):
             added += 1
     return added
@@ -399,13 +455,17 @@ def cmd_fetch(args):
     sel = [s for s in load_sources() if (not args.source or s["id"] == args.source)]
     added = 0
     for s in sel:
+        remaining = args.max_total - added
+        if remaining <= 0:
+            break
         if s.get("method") == "rss":
-            added += _fetch_rss(con, s, args)
+            added += _fetch_rss(con, s, args, remaining)
         elif s["id"] in DISCOVERERS:
-            added += _fetch_nonrss(con, s, args)
+            added += _fetch_nonrss(con, s, args, remaining)
         elif args.source:
             log(f"  (no auto-fetch for method={s.get('method')}: {s['id']})")
-    log(f"fetch done: {added} new article(s)")
+    prefix = "would fetch" if args.dry_run else "fetch done"
+    log(f"{prefix}: {added} new article(s)")
 
 
 # ================= generate =================
@@ -547,30 +607,59 @@ def write_case(row, data: dict) -> Path:
 def cmd_generate(args):
     con = db_connect()
     vocab = load_vocab()
-    rows = con.execute(
-        "SELECT * FROM articles WHERE status='fetched' AND text IS NOT NULL AND text!='' ORDER BY published DESC"
-    ).fetchall()
+    if args.dry_run:
+        sql = """SELECT * FROM articles
+                 WHERE status='fetched' AND text IS NOT NULL AND text!=''
+                 ORDER BY published DESC, fetched_at ASC"""
+        rows = con.execute(sql + (" LIMIT ?" if args.limit else ""), ((args.limit,) if args.limit else ())).fetchall()
+    else:
+        rows = claim_fetched(con, args.limit)
     done = 0
     for row in rows:
-        if args.limit and done >= args.limit:
-            break
         if args.dry_run:
             log("  would generate", row["id"]); done += 1; continue
         try:
             data = parse_json(run_claude(build_prompt(row, vocab)))
+            path = write_case(row, data)
         except Exception as e:
-            con.execute("UPDATE articles SET status='error', error=? WHERE id=?", (str(e)[:300], row["id"]))
+            con.execute(
+                "UPDATE articles SET status='error', error=? WHERE id=? AND status='generating'",
+                (str(e)[:300], row["id"]),
+            )
             con.commit()
             log("  gen-fail", row["id"], type(e).__name__, str(e)[:160]); continue
-        path = write_case(row, data)
         con.execute(
-            "UPDATE articles SET status='generated', case_path=?, generated_at=? WHERE id=?",
+            """UPDATE articles
+               SET status='generated', case_path=?, generated_at=?, error=NULL
+               WHERE id=? AND status='generating'""",
             (str(path.relative_to(ROOT)), now_iso(), row["id"]),
         )
         con.commit()
         log("  wrote", f"cases/{row['id']}.md", "|", data.get("type"), "|", data.get("title", "")[:45])
         done += 1
     log(f"generate done: {done} case(s)")
+
+
+def cmd_retry(args):
+    con = db_connect()
+    statuses = ["error"]
+    if args.include_generating:
+        statuses.append("generating")
+    placeholders = ",".join("?" for _ in statuses)
+    sql = f"SELECT id FROM articles WHERE status IN ({placeholders}) ORDER BY last_attempt_at ASC"
+    params: list = list(statuses)
+    if args.limit:
+        sql += " LIMIT ?"
+        params.append(args.limit)
+    ids = [r["id"] for r in con.execute(sql, params)]
+    if ids:
+        marks = ",".join("?" for _ in ids)
+        con.execute(
+            f"UPDATE articles SET status='fetched', error=NULL WHERE id IN ({marks})",
+            ids,
+        )
+        con.commit()
+    print(f"retry queued: {len(ids)} article(s)")
 
 
 def cmd_status(args):
@@ -584,31 +673,54 @@ def cmd_status(args):
     for r in con.execute(
         """SELECT source_id,
                   SUM(status='fetched') fetched, SUM(status='generated') generated,
-                  SUM(status='error') err, COUNT(*) total
+                  SUM(status='generating') generating, SUM(status='error') err, COUNT(*) total
            FROM articles GROUP BY source_id ORDER BY total DESC"""
     ):
-        print(f"  {r['source_id']:34} fetched={r['fetched']:<3} generated={r['generated']:<3} error={r['err']:<2} total={r['total']}")
+        print(
+            f"  {r['source_id']:34} fetched={r['fetched']:<3} generating={r['generating']:<3} "
+            f"generated={r['generated']:<3} error={r['err']:<2} total={r['total']}"
+        )
 
 
 def cmd_run(args):
     cmd_fetch(args)
+    args.limit = args.generate_limit
     cmd_generate(args)
+
+
+def positive_int(value: str) -> int:
+    n = int(value)
+    if n <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return n
 
 
 def main():
     ap = argparse.ArgumentParser(description="ai-architecture-digest collector (SQLite 台帳)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     pf = sub.add_parser("fetch")
-    pf.add_argument("--source"); pf.add_argument("--limit", type=int, default=5)
-    pf.add_argument("--max-fetch", type=int, default=30); pf.add_argument("--dry-run", action="store_true")
+    pf.add_argument("--source")
+    pf.add_argument("--max-new-per-source", "--limit", dest="max_new_per_source", type=positive_int, default=50)
+    pf.add_argument("--max-total", type=positive_int, default=500)
+    pf.add_argument("--max-fetch", type=positive_int, default=100)
+    pf.add_argument("--dry-run", action="store_true")
     pf.set_defaults(func=cmd_fetch)
     pg = sub.add_parser("generate")
-    pg.add_argument("--limit", type=int, default=0); pg.add_argument("--dry-run", action="store_true")
+    pg.add_argument("--limit", type=positive_int, default=3)
+    pg.add_argument("--dry-run", action="store_true")
     pg.set_defaults(func=cmd_generate)
     sub.add_parser("status").set_defaults(func=cmd_status)
+    pt = sub.add_parser("retry")
+    pt.add_argument("--limit", type=positive_int, default=0)
+    pt.add_argument("--include-generating", action="store_true")
+    pt.set_defaults(func=cmd_retry)
     pr = sub.add_parser("run")
-    pr.add_argument("--source"); pr.add_argument("--limit", type=int, default=3)
-    pr.add_argument("--max-fetch", type=int, default=30); pr.add_argument("--dry-run", action="store_true")
+    pr.add_argument("--source")
+    pr.add_argument("--max-new-per-source", "--limit", dest="max_new_per_source", type=positive_int, default=50)
+    pr.add_argument("--max-total", type=positive_int, default=500)
+    pr.add_argument("--max-fetch", type=positive_int, default=100)
+    pr.add_argument("--generate-limit", type=positive_int, default=3)
+    pr.add_argument("--dry-run", action="store_true")
     pr.set_defaults(func=cmd_run)
     args = ap.parse_args()
     args.func(args)
