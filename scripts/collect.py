@@ -358,11 +358,17 @@ def discover_azure_architecture_center() -> list[dict]:
     sub_re = re.compile(r"^https://learn\.microsoft\.com/_sitemaps/azure_en-us_\d+\.xml$")
     subs = [l for l in LOC_RE.findall(idx) if sub_re.match(l)]
     dated, seen = [], set()
+    fails = 0
     for sm in subs:
         try:
             xml = fetch_bytes(sm).decode("utf-8", errors="ignore")
         except Exception as e:
-            log("  fail-sitemap", sm, type(e).__name__); continue
+            fails += 1
+            log("  fail-sitemap", sm, type(e).__name__)
+            if fails >= 3:  # 500storm 等で連続失敗が続くなら打ち切り（fetch 全体の長時間化を防ぐ）
+                log("  azure discovery: 連続失敗が多いため打ち切り"); break
+            continue
+        fails = 0
         for block in xml.split("<url>")[1:]:
             m = LOC_RE.search(block)
             if not m:
@@ -377,22 +383,37 @@ def discover_azure_architecture_center() -> list[dict]:
     return [{"url": u, "date": norm_date(d)} for d, u in dated]
 
 
+GCP_ARCH_HREF_RE = re.compile(
+    r'''href=["'](?:https?://docs\.cloud\.google\.com)?(/architecture/[^"'#?]+)["']''')
+
+
 def discover_gcp_architecture_center() -> list[dict]:
-    # docs.cloud.google.com/sitemap.xml（60分割 gzip）→ /architecture/。lastmod無し（日付はページから補完）。
-    idx = fetch_bytes("https://docs.cloud.google.com/sitemap.xml").decode("utf-8", errors="ignore")
-    out, seen = [], set()
-    for sm in LOC_RE.findall(idx):
-        try:
-            raw = fetch_bytes(sm)
-        except Exception as e:
-            log("  fail-sitemap", sm, type(e).__name__); continue
-        if raw[:2] == b"\x1f\x8b":
-            raw = gzip.decompress(raw)
-        for loc in LOC_RE.findall(raw.decode("utf-8", errors="ignore")):
-            if "/architecture/" in loc and "hl=" not in loc and loc not in seen:
-                seen.add(loc); out.append({"url": loc})
-        if len(out) >= 200:  # 早期打ち切り（全60分割は重い・日付が無く順序も任意のため）
+    # docs.cloud.google.com のサブサイトマップ（60分割）が恒常500のため、hub ページの HTML
+    # から /architecture/ 記事リンクを採る。各 hub の共有左ナビに記事一覧(~390)が入っている。
+    # landing は hub のみ／各 hub は全記事リンクを静的HTMLで返す。lastmod無し（日付はページから補完）。Issue #21。
+    base = "https://docs.cloud.google.com"
+    out, seen, hubs = [], set(), []
+
+    def harvest(html: str) -> None:
+        for href in GCP_ARCH_HREF_RE.findall(html):
+            url = base + href.rstrip("/")
+            if url not in seen:
+                seen.add(url); out.append({"url": url})
+
+    try:
+        landing = fetch_bytes(base + "/architecture").decode("utf-8", errors="ignore")
+        harvest(landing)  # landing 自身のリンクも採る（再fetchしない）
+        hubs = sorted({h.rstrip("/") for h in GCP_ARCH_HREF_RE.findall(landing)
+                       if h.rstrip("/").count("/") == 2})  # /architecture/<hub> のみ巡回
+    except Exception as e:
+        log("  gcp landing-fail", type(e).__name__)
+    for path in hubs:
+        if len(out) >= 200:  # 早期打ち切り（共有ナビは各 hub でほぼ同一・日付が無く順序も任意のため）
             break
+        try:
+            harvest(fetch_bytes(base + path).decode("utf-8", errors="ignore"))
+        except Exception as e:
+            log("  gcp page-fail", path, type(e).__name__)
     return out
 
 
