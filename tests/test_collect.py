@@ -66,6 +66,13 @@ class CollectorTestCase(unittest.TestCase):
         self.assertEqual(row["retry_count"], 0)
         self.assertIsNone(row["last_attempt_at"])
 
+    def test_db_connect_enables_concurrency_pragmas(self):
+        # fetch と generate が同時に走っても database is locked で落ちないための設定を守る。
+        con = collector.db_connect()
+        self.addCleanup(con.close)
+        self.assertEqual(con.execute("PRAGMA journal_mode").fetchone()[0].lower(), "wal")
+        self.assertEqual(con.execute("PRAGMA busy_timeout").fetchone()[0], 10000)
+
     def test_rss_scans_past_known_items_and_respects_new_limit(self):
         con = collector.db_connect()
         con.execute(

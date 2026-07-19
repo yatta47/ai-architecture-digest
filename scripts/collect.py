@@ -101,6 +101,13 @@ def db_connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
+    # 並行アクセス耐性（fetch と generate が同時に走っても壊れない）:
+    #   - WAL: 読み取りと書き込みの同時実行を許す。
+    #   - busy_timeout: 書き込みロック競合時に即 "database is locked" で落ちず、最大10秒待つ。
+    # 通常はスケジュールで時間帯を分けているが（fetch 02:30 / generate 03:00）、
+    # 片方が長引いて重なっても claim_fetched(BEGIN IMMEDIATE) と fetch の INSERT が衝突しない。
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA busy_timeout=10000")
     con.execute(
         """CREATE TABLE IF NOT EXISTS articles(
             id TEXT PRIMARY KEY,
